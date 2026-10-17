@@ -1,12 +1,16 @@
+using System.Runtime.InteropServices;
 using Brutal.GlfwApi;
 using Brutal.Numerics;
-using Brutal.VulkanApi;
+using Brutal.OpenGlApi;
 using Scorpion_Box_Brutal_Core;
 
-public class WindowWrapper : IDisposable
+public unsafe class WindowWrapper : IDisposable
 {
-    public VulkanWrapper VulkanWrapper;
     public readonly WindowState State;
+
+    // Held in a field so the delegate isn't collected while native code may still call it
+    private static readonly GlGetProcAddressFunc GetProcAddress = name =>
+        Glfw.GetProcAddress(MemoryMarshal.CreateReadOnlySpanFromNullTerminated(name));
 
     public WindowWrapper()
     {
@@ -17,14 +21,28 @@ public class WindowWrapper : IDisposable
             throw new Exception("Failed to initialize GLFW");
         }
 
-        Glfw.WindowHint(GlfwWindowHint.ClientApi, 0);
+        // OpenGL 3.3 core is the baseline everywhere, forward compatible so macOS accepts it too
+        Glfw.WindowHint(GlfwWindowHint.ClientApi, Glfw.Constants.GLFW_OPENGL_API);
+        Glfw.WindowHint(GlfwWindowHint.ContextVersionMajor, 3);
+        Glfw.WindowHint(GlfwWindowHint.ContextVersionMinor, 3);
+        Glfw.WindowHint(GlfwWindowHint.OpenGlProfile, Glfw.Constants.GLFW_OPENGL_CORE_PROFILE);
+        Glfw.WindowHint(GlfwWindowHint.OpenGlForwardCompat, 1);
         State.Window = Glfw.CreateWindow(new GlfwWindow.CreateInfo
         {
             Title = "Brutal",
             Size = new int2(800, 600),
         });
 
-        VulkanWrapper = new VulkanWrapper(State);
+        State.Window.MakeContextCurrent();
+        if (!Glad.Initialize(GetProcAddress))
+        {
+            throw new Exception("Failed to load OpenGL functions");
+        }
+
+        // Vsync
+        Glfw.SwapInterval(1);
+
+        State.Renderer = new FrameRenderer(State);
     }
 
     public bool IsRunning
@@ -43,7 +61,7 @@ public class WindowWrapper : IDisposable
 
     public void Dispose()
     {
-        VulkanWrapper.Dispose();
+        State.Renderer.Dispose();
         State.Window.Dispose();
         Glfw.Terminate();
     }
