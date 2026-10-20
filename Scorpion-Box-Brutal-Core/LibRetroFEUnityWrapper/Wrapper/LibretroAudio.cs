@@ -26,19 +26,9 @@ namespace SK.Libretro
 {
     public partial class Wrapper
     {
-        public int BytesPerPixel
-        {
-            get
-            {
-                return Game.PixelFormat switch
-                {
-                    retro_pixel_format.RETRO_PIXEL_FORMAT_RGB565 => 2,
-                    retro_pixel_format.RETRO_PIXEL_FORMAT_0RGB1555 => 2,
-                    retro_pixel_format.RETRO_PIXEL_FORMAT_XRGB8888 => 4,
-                    _ => 2,
-                };
-            }
-        }
+        public double FPS => Game.SystemAVInfo.timing.fps;
+        public uint Width => Game.SystemAVInfo.geometry.base_width;
+        public uint Height => Game.SystemAVInfo.geometry.base_height;
 
         public void RetroAudioSampleCallback(short left, short right)
         {

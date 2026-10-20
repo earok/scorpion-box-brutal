@@ -1,385 +1,337 @@
-﻿/*
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using Microsoft.Xna.Framework.Input;
+﻿using Brutal.GlfwApi;
 using SK.Libretro;
 using static SK.Libretro.Wrapper;
 
-namespace ScorpionBox.Core.Processors;
-internal class ScorpionInputProcessor : IInputProcessor
+namespace ScorpionBox.Processors
 {
-    private ScorpionBoxGame _box;
-    private bool _useXInput;
-    private float _deadZone;
-    private float _axisDeadZone;
-    private HashSet<Tuple<int, int>> _stableJoystickAxes = [];
 
-    private Dictionary<retro_key, Keys> _keyMap = [];
-    private Dictionary<retro_key, Keys> _keyMapShifted = [];
-    private Dictionary<Keys, retro_key> _inversekeyMap = [];
-    private Dictionary<Keys, retro_key> _inversekeyMapShifted = [];
-
-    private Keys[] _lastPressedKeys = [];
-    private int _lastMouseX;
-    private int _lastMouseY;
-    private float _mouseDeltaX;
-    private float _mouseDeltaY;
-
-    public ScorpionInputProcessor(ScorpionBoxGame scorpionBoxGame, bool useXInput, float deadZone)
+    internal class ScorpionInputProcessor : IInputProcessor
     {
+        private ScorpionBoxGame _box;
+        private Wrapper _retro;
+        private GlfwWindow _window;
 
-        var mouseState = Mouse.GetState();
+        private float _deadZone;
+        private float _axisDeadZone;
+        private HashSet<Tuple<int, int>> _stableJoystickAxes = [];
+        //    private Keys[] _lastPressedKeys = [];
+        private int _lastMouseX;
+        private int _lastMouseY;
+        private float _mouseDeltaX;
+        private float _mouseDeltaY;
 
-        _box = scorpionBoxGame;
-        _useXInput = useXInput;
-        _deadZone = deadZone;
-        _axisDeadZone = 32767 * deadZone;
+        private Dictionary<retro_key, GlfwKey> _keyMap = [];
+        private Dictionary<retro_key, GlfwKey> _keyMapShifted = [];
+        private Dictionary<GlfwKey, retro_key> _inversekeyMap = [];
+        private Dictionary<GlfwKey, retro_key> _inversekeyMapShifted = [];
 
-        _keyMap[retro_key.RETROK_BACKSPACE] = Keys.Back;
-        _keyMap[retro_key.RETROK_TAB] = Keys.Tab;
-        _keyMap[retro_key.RETROK_CLEAR] = Keys.OemClear;
-        _keyMap[retro_key.RETROK_RETURN] = Keys.Enter;
-        _keyMap[retro_key.RETROK_PAUSE] = Keys.Pause;
-        _keyMap[retro_key.RETROK_ESCAPE] = Keys.Escape;
-        _keyMap[retro_key.RETROK_SPACE] = Keys.Space;
-        _keyMap[retro_key.RETROK_QUOTE] = Keys.OemQuotes;
-        _keyMap[retro_key.RETROK_PERIOD] = Keys.OemPeriod;
-        _keyMap[retro_key.RETROK_SEMICOLON] = Keys.OemSemicolon;
-        _keyMap[retro_key.RETROK_COMMA] = Keys.OemComma;
-        _keyMap[retro_key.RETROK_EQUALS] = Keys.OemPlus;
-        _keyMap[retro_key.RETROK_QUESTION] = Keys.OemQuestion;
-        _keyMap[retro_key.RETROK_MINUS] = Keys.OemMinus;
-        _keyMap[retro_key.RETROK_LEFTBRACKET] = Keys.OemOpenBrackets;
-        _keyMap[retro_key.RETROK_RIGHTBRACKET] = Keys.OemCloseBrackets;
-        _keyMap[retro_key.RETROK_BACKSLASH] = Keys.OemBackslash;
-        _keyMap[retro_key.RETROK_DELETE] = Keys.Delete;
+        private readonly GlfwJoystickHat[] _hatLeft = { GlfwJoystickHat.Left, GlfwJoystickHat.LeftUp, GlfwJoystickHat.LeftDown };
+        private readonly GlfwJoystickHat[] _hatRight = { GlfwJoystickHat.Right, GlfwJoystickHat.RightUp, GlfwJoystickHat.RightDown };
+        private readonly GlfwJoystickHat[] _hatUp = { GlfwJoystickHat.Up, GlfwJoystickHat.LeftUp, GlfwJoystickHat.RightUp };
+        private readonly GlfwJoystickHat[] _hatDown = { GlfwJoystickHat.Down, GlfwJoystickHat.LeftDown, GlfwJoystickHat.RightDown };
 
-        //Direct loops
-        for (var i = 0; i <= 9; i++)
+        public ScorpionInputProcessor(ScorpionBoxGame box, Wrapper retro, GlfwWindow window)
         {
-            _keyMap[retro_key.RETROK_0 + i] = Keys.D0 + i;
-        }
-        for (var i = 0; i <= 9; i++)
-        {
-            _keyMap[retro_key.RETROK_KP0 + i] = Keys.NumPad0 + i;
-        }
-        for (var i = 1; i <= 15; i++)
-        {
-            _keyMap[retro_key.RETROK_F1 + i - 1] = Keys.F1 + i - 1;
-        }
-        for (var i = 0; i <= 25; i++)
-        {
-            _keyMap[retro_key.RETROK_a + i] = Keys.A + i;
-        }
+            _box = box;
+            _retro = retro;
+            _window = window;
 
+            _keyMap[retro_key.RETROK_BACKSPACE] = GlfwKey.Backspace;
+            _keyMap[retro_key.RETROK_TAB] = GlfwKey.Tab;
+            _keyMap[retro_key.RETROK_RETURN] = GlfwKey.Enter;
+            _keyMap[retro_key.RETROK_PAUSE] = GlfwKey.Pause;
+            _keyMap[retro_key.RETROK_ESCAPE] = GlfwKey.Escape;
+            _keyMap[retro_key.RETROK_SPACE] = GlfwKey.Space;
+            _keyMap[retro_key.RETROK_DELETE] = GlfwKey.Delete;
 
-        _keyMap[retro_key.RETROK_KP_PERIOD] = Keys.Decimal;
-        _keyMap[retro_key.RETROK_KP_DIVIDE] = Keys.Divide;
-        _keyMap[retro_key.RETROK_KP_MULTIPLY] = Keys.Multiply;
-        _keyMap[retro_key.RETROK_KP_MINUS] = Keys.Subtract;
-        _keyMap[retro_key.RETROK_KP_PLUS] = Keys.Add;
-        _keyMap[retro_key.RETROK_KP_ENTER] = Keys.Separator;
-        _keyMap[retro_key.RETROK_KP_EQUALS] = Keys.Separator; //Not really sure here
+            _keyMap[retro_key.RETROK_QUOTE] = GlfwKey.Apostrophe;
+            _keyMap[retro_key.RETROK_PERIOD] = GlfwKey.Period;
+            _keyMap[retro_key.RETROK_SEMICOLON] = GlfwKey.Semicolon;
+            _keyMap[retro_key.RETROK_COMMA] = GlfwKey.Comma;
+            _keyMap[retro_key.RETROK_EQUALS] = GlfwKey.Equal;
+            _keyMap[retro_key.RETROK_SLASH] = GlfwKey.Slash;
+            _keyMap[retro_key.RETROK_MINUS] = GlfwKey.Minus;
+            _keyMap[retro_key.RETROK_LEFTBRACKET] = GlfwKey.LeftBracket;
+            _keyMap[retro_key.RETROK_RIGHTBRACKET] = GlfwKey.RightBracket;
+            _keyMap[retro_key.RETROK_BACKSLASH] = GlfwKey.Backslash;
+            _keyMap[retro_key.RETROK_BACKQUOTE] = GlfwKey.GraveAccent;
 
-        _keyMap[retro_key.RETROK_UP] = Keys.Up;
-        _keyMap[retro_key.RETROK_DOWN] = Keys.Down;
-        _keyMap[retro_key.RETROK_LEFT] = Keys.Left;
-        _keyMap[retro_key.RETROK_RIGHT] = Keys.Right;
-
-        _keyMap[retro_key.RETROK_INSERT] = Keys.Insert;
-        _keyMap[retro_key.RETROK_HOME] = Keys.Home;
-        _keyMap[retro_key.RETROK_END] = Keys.End;
-        _keyMap[retro_key.RETROK_PAGEUP] = Keys.PageUp;
-        _keyMap[retro_key.RETROK_PAGEDOWN] = Keys.PageDown;
-
-        _keyMap[retro_key.RETROK_NUMLOCK] = Keys.NumLock;
-        _keyMap[retro_key.RETROK_CAPSLOCK] = Keys.CapsLock;
-        _keyMap[retro_key.RETROK_SCROLLOCK] = Keys.Scroll;
-
-        _keyMap[retro_key.RETROK_LSHIFT] = Keys.LeftShift;
-        _keyMap[retro_key.RETROK_RSHIFT] = Keys.RightShift;
-
-        _keyMap[retro_key.RETROK_LCTRL] = Keys.LeftControl;
-        _keyMap[retro_key.RETROK_RCTRL] = Keys.RightControl;
-
-        _keyMap[retro_key.RETROK_LALT] = Keys.LeftAlt;
-        _keyMap[retro_key.RETROK_RALT] = Keys.RightAlt;
-
-        _keyMap[retro_key.RETROK_LMETA] = Keys.LeftWindows;
-        _keyMap[retro_key.RETROK_RMETA] = Keys.RightWindows;
-
-        _keyMap[retro_key.RETROK_COMPOSE] = Keys.LaunchMail;
-        _keyMap[retro_key.RETROK_HELP] = Keys.Help;
-        _keyMap[retro_key.RETROK_PRINT] = Keys.PrintScreen; //Should this be print?
-
-        //Shifted keys
-        _keyMapShifted[retro_key.RETROK_EXCLAIM] = Keys.D1;
-        _keyMapShifted[retro_key.RETROK_AT] = Keys.D2;
-        _keyMapShifted[retro_key.RETROK_HASH] = Keys.D3;
-        _keyMapShifted[retro_key.RETROK_DOLLAR] = Keys.D4;
-        _keyMapShifted[retro_key.RETROK_DOLLAR + 1] = Keys.D5; //Missing definition for % ?
-        _keyMapShifted[retro_key.RETROK_CARET] = Keys.D6;
-        _keyMapShifted[retro_key.RETROK_AMPERSAND] = Keys.D7;
-        _keyMapShifted[retro_key.RETROK_ASTERISK] = Keys.D8;
-        _keyMapShifted[retro_key.RETROK_LEFTPAREN] = Keys.D9;
-        _keyMapShifted[retro_key.RETROK_RIGHTPAREN] = Keys.D0;
-
-        _keyMapShifted[retro_key.RETROK_QUOTEDBL] = Keys.OemQuotes;
-        _keyMapShifted[retro_key.RETROK_PLUS] = Keys.OemPlus;
-        _keyMapShifted[retro_key.RETROK_SLASH] = Keys.OemQuestion;
-        _keyMapShifted[retro_key.RETROK_COLON] = Keys.OemSemicolon;
-        _keyMapShifted[retro_key.RETROK_LESS] = Keys.OemComma;
-        _keyMapShifted[retro_key.RETROK_GREATER] = Keys.OemPeriod;
-        _keyMapShifted[retro_key.RETROK_UNDERSCORE] = Keys.OemMinus;
-        _keyMapShifted[retro_key.RETROK_BACKQUOTE] = Keys.OemTilde;
-
-        _keyMapShifted[retro_key.RETROK_LEFTBRACKET] = Keys.OemOpenBrackets;
-        _keyMapShifted[retro_key.RETROK_RIGHTBRACKET] = Keys.OemCloseBrackets;
-        _keyMapShifted[retro_key.RETROK_BAR] = Keys.OemBackslash;
-        _keyMapShifted[retro_key.RETROK_TILDE] = Keys.OemTilde;
-
-        //fix the shifted keys to ensure they contain every keypair
-        foreach (var keyPair in _keyMap)
-        {
-            if (_keyMapShifted.ContainsKey(keyPair.Key) == false)
+            //Direct loops
+            for (var i = 0; i <= 9; i++)
             {
-                _keyMapShifted[keyPair.Key] = keyPair.Value;
+                _keyMap[retro_key.RETROK_0 + i] = GlfwKey.Number0 + i;
             }
-        }
-
-        //Inverse the keys
-        foreach (var keypair in _keyMap)
-        {
-            _inversekeyMap[keypair.Value] = keypair.Key;
-        }
-        foreach (var keypair in _keyMapShifted)
-        {
-            _inversekeyMapShifted[keypair.Value] = keypair.Key;
-        }
-
-        /* unknown?
-_keyMap[retro_key.RETROK_LSUPER] = Keys.LeftWindows;
-_keyMap[retro_key.RETROK_RSUPER] = Keys.RightWindows;
-_keyMap[retro_key.RETROK_MODE] = //Function lock key?
-_keyMap[retro_key.RETROK_SYSREQ] = 
-_keyMap[retro_key.RETROK_BREAK] =
-_keyMap[retro_key.RETROK_MENU] =
-_keyMap[retro_key.RETROK_POWER]
-_keyMap[retro_key.RETROK_EURO]  //Map to dollar?
-_keyMap[retro_key.RETROK_UNDO]  //Map to dollar?
-_keyMap[retro_key.RETROK_OEM_102]
- 
-
-    }
-
-    public bool JoypadButton(int port, int button)
-    {
-        var state = Keyboard.GetState();
-        if (_box.KeyDictionary.TryGetValue(port, out var portData))
-        {
-            if (portData.TryGetValue((retro_device_id_joypad)button, out var key))
+            for (var i = 0; i <= 9; i++)
             {
-                if (state.IsKeyDown(key))
+                _keyMap[retro_key.RETROK_KP0 + i] = GlfwKey.Kp0 + i;
+            }
+            for (var i = 1; i <= 15; i++)
+            {
+                _keyMap[retro_key.RETROK_F1 + i - 1] = GlfwKey.F1 + i - 1;
+            }
+            for (var i = 0; i <= 25; i++)
+            {
+                _keyMap[retro_key.RETROK_a + i] = GlfwKey.A + i;
+            }
+
+            _keyMap[retro_key.RETROK_UP] = GlfwKey.Up;
+            _keyMap[retro_key.RETROK_DOWN] = GlfwKey.Down;
+            _keyMap[retro_key.RETROK_LEFT] = GlfwKey.Left;
+            _keyMap[retro_key.RETROK_RIGHT] = GlfwKey.Right;
+            _keyMap[retro_key.RETROK_INSERT] = GlfwKey.Insert;
+            _keyMap[retro_key.RETROK_HOME] = GlfwKey.Home;
+            _keyMap[retro_key.RETROK_END] = GlfwKey.End;
+            _keyMap[retro_key.RETROK_PAGEUP] = GlfwKey.PageUp;
+            _keyMap[retro_key.RETROK_PAGEDOWN] = GlfwKey.PageDown;
+            _keyMap[retro_key.RETROK_NUMLOCK] = GlfwKey.NumLock;
+            _keyMap[retro_key.RETROK_CAPSLOCK] = GlfwKey.CapsLock;
+            _keyMap[retro_key.RETROK_LSHIFT] = GlfwKey.LeftShift;
+            _keyMap[retro_key.RETROK_RSHIFT] = GlfwKey.RightShift;
+            _keyMap[retro_key.RETROK_LCTRL] = GlfwKey.LeftControl;
+            _keyMap[retro_key.RETROK_RCTRL] = GlfwKey.RightControl;
+            _keyMap[retro_key.RETROK_LALT] = GlfwKey.LeftAlt;
+            _keyMap[retro_key.RETROK_RALT] = GlfwKey.RightAlt;
+            _keyMap[retro_key.RETROK_PRINT] = GlfwKey.PrintScreen;
+
+            _keyMap[retro_key.RETROK_KP_PERIOD] = GlfwKey.KpDecimal;
+            _keyMap[retro_key.RETROK_KP_DIVIDE] = GlfwKey.KpDivide;
+            _keyMap[retro_key.RETROK_KP_MULTIPLY] = GlfwKey.KpMultiply;
+            _keyMap[retro_key.RETROK_KP_MINUS] = GlfwKey.KpSubtract;
+            _keyMap[retro_key.RETROK_KP_PLUS] = GlfwKey.KpAdd;
+            _keyMap[retro_key.RETROK_KP_ENTER] = GlfwKey.KpEnter;
+            _keyMap[retro_key.RETROK_KP_EQUALS] = GlfwKey.KpEqual;
+            _keyMap[retro_key.RETROK_SCROLLOCK] = GlfwKey.ScrollLock;
+            _keyMap[retro_key.RETROK_LSUPER] = GlfwKey.LeftSuper;
+            _keyMap[retro_key.RETROK_RSUPER] = GlfwKey.RightSuper;
+            _keyMap[retro_key.RETROK_MENU] = GlfwKey.Menu;
+            _keyMap[retro_key.RETROK_OEM_102] = GlfwKey.World2;
+
+            //Shifted keys
+            _keyMapShifted[retro_key.RETROK_EXCLAIM] = GlfwKey.Number1;
+            _keyMapShifted[retro_key.RETROK_AT] = GlfwKey.Number2;
+            _keyMapShifted[retro_key.RETROK_HASH] = GlfwKey.Number3;
+            _keyMapShifted[retro_key.RETROK_DOLLAR] = GlfwKey.Number4;
+            _keyMapShifted[(retro_key)'%'] = GlfwKey.Number5; //libretro.h has no RETROK_PERCENT
+            _keyMapShifted[retro_key.RETROK_CARET] = GlfwKey.Number6;
+            _keyMapShifted[retro_key.RETROK_AMPERSAND] = GlfwKey.Number7;
+            _keyMapShifted[retro_key.RETROK_ASTERISK] = GlfwKey.Number8;
+            _keyMapShifted[retro_key.RETROK_LEFTPAREN] = GlfwKey.Number9;
+            _keyMapShifted[retro_key.RETROK_RIGHTPAREN] = GlfwKey.Number0;
+
+            _keyMapShifted[retro_key.RETROK_QUOTEDBL] = GlfwKey.Apostrophe;
+            _keyMapShifted[retro_key.RETROK_PLUS] = GlfwKey.Equal;
+            _keyMapShifted[retro_key.RETROK_QUESTION] = GlfwKey.Slash;
+            _keyMapShifted[retro_key.RETROK_COLON] = GlfwKey.Semicolon;
+            _keyMapShifted[retro_key.RETROK_LESS] = GlfwKey.Comma;
+            _keyMapShifted[retro_key.RETROK_GREATER] = GlfwKey.Period;
+            _keyMapShifted[retro_key.RETROK_UNDERSCORE] = GlfwKey.Minus;
+
+            _keyMapShifted[retro_key.RETROK_LEFTBRACE] = GlfwKey.LeftBracket;
+            _keyMapShifted[retro_key.RETROK_RIGHTBRACE] = GlfwKey.RightBracket;
+            _keyMapShifted[retro_key.RETROK_BAR] = GlfwKey.Backslash;
+            _keyMapShifted[retro_key.RETROK_TILDE] = GlfwKey.GraveAccent;
+
+            //fix the shifted keys to ensure they contain every keypair
+            foreach (var keyPair in _keyMap)
+            {
+                if (_keyMapShifted.ContainsKey(keyPair.Key) == false)
                 {
-                    return true;
+                    _keyMapShifted[keyPair.Key] = keyPair.Value;
                 }
             }
+
+            //Inverse the keys
+            foreach (var keypair in _keyMap)
+            {
+                _inversekeyMap[keypair.Value] = keypair.Key;
+            }
+            foreach (var keypair in _keyMapShifted)
+            {
+                _inversekeyMapShifted[keypair.Value] = keypair.Key;
+            }
+
+            _retro.ActivateInput(this);
         }
 
-        if (_useXInput)
+        public ScorpionInputProcessor SetDeadZone(float deadZone)
         {
-            var gpState = GamePad.GetState(port);
-            if (gpState.IsConnected)
+            _deadZone = deadZone;
+            _axisDeadZone = 32767 * deadZone;
+            return this;
+        }
+
+        public unsafe bool JoypadButton(int port, int button)
+        {
+            //Check the keyboard bindings first
+            if (_box.KeyDictionary.TryGetValue(port, out var portData))
             {
+                if (portData.TryGetValue((retro_device_id_joypad)button, out var key))
+                {
+                    if (KeyDown(key))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            //We don't have a joystick plugged in that port
+            if (Glfw.JoystickPresent(port) == false)
+            {
+                return false;
+            }
+
+            //Use gamepad interface (temporary fallback test to regular joystick)
+            if (Glfw.JoystickIsGamepad(port) && false)
+            {
+                Glfw.GetGamepadState(port, out var gpState);
                 switch ((retro_device_id_joypad)button)
                 {
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_LEFT:
-                        return gpState.DPad.Left == ButtonState.Pressed || gpState.ThumbSticks.Left.X < -_deadZone;
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.DpadLeft) || gpState.Axes[(int)GlfwGamepadAxis.LeftX] < -_deadZone;
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_RIGHT:
-                        return gpState.DPad.Right == ButtonState.Pressed || gpState.ThumbSticks.Left.X > _deadZone;
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.DpadRight) || gpState.Axes[(int)GlfwGamepadAxis.LeftX] > _deadZone;
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_DOWN:
-                        return gpState.DPad.Down == ButtonState.Pressed || gpState.ThumbSticks.Left.Y < -_deadZone;
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.DpadDown) || gpState.Axes[(int)GlfwGamepadAxis.LeftY] > _deadZone;
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_UP:
-                        return gpState.DPad.Up == ButtonState.Pressed || gpState.ThumbSticks.Left.Y > _deadZone;
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.DpadUp) || gpState.Axes[(int)GlfwGamepadAxis.LeftY] < -_deadZone;
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_A:
-                        return gpState.IsButtonDown(Buttons.A);
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.A);
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_B:
-                        return gpState.IsButtonDown(Buttons.B);
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.B);
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_X:
-                        return gpState.IsButtonDown(Buttons.X);
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.X);
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_Y:
-                        return gpState.IsButtonDown(Buttons.Y);
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.Y);
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_START:
-                        return gpState.IsButtonDown(Buttons.Start);
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.Start);
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_SELECT:
-                        return gpState.IsButtonDown(Buttons.Back);
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.Back);
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_L:
-                        return gpState.IsButtonDown(Buttons.LeftShoulder);
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.LeftBumper);
                     case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_R:
-                        return gpState.IsButtonDown(Buttons.RightShoulder);
+                        return IsJoypadButtonDown(gpState, GlfwGamepadButton.RightBumper);
                 }
             }
-        }
-        else
-        {
-            var joystick = Joystick.GetState(port);
-            if (joystick.IsConnected) 
+
+            //Not a gamepad, fallback
+            var hats = Glfw.GetJoystickHats(port);
+            var axes = Glfw.GetJoystickAxes(port);
+            var buttons = Glfw.GetJoystickButtons(port);
+
+            switch ((retro_device_id_joypad)button)
             {
-                switch ((retro_device_id_joypad)button)
-                {
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_LEFT:
-                        return TestJoystickAxis(joystick, port, 0) < 0;
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_RIGHT:
-                        return TestJoystickAxis(joystick, port, 0) > 0;
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_DOWN:
-                        return TestJoystickAxis(joystick, port, 1) > 0;
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_UP:
-                        return TestJoystickAxis(joystick, port, 1) < 0;
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_A:
-                        return TestJoystickButton(joystick, 0);
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_B:
-                        return TestJoystickButton(joystick, 1);
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_X:
-                        return TestJoystickButton(joystick, 2);
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_Y:
-                        return TestJoystickButton(joystick, 3);
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_L:
-                        return TestJoystickButton(joystick, 4);
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_R:
-                        return TestJoystickButton(joystick, 5);
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_START:
-                        return TestJoystickButton(joystick, 6);
-                    case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_SELECT:
-                        return TestJoystickButton(joystick, 7);
-                }
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_LEFT:
+                    return IsJoystickHat(hats, _hatLeft) || JoystickAxis(axes, 0) < -_deadZone;
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_RIGHT:
+                    return IsJoystickHat(hats, _hatRight) || JoystickAxis(axes, 0) > _deadZone;
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_UP:
+                    return IsJoystickHat(hats, _hatUp) || JoystickAxis(axes, 1) < -_deadZone;
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_DOWN:
+                    return IsJoystickHat(hats, _hatDown) || JoystickAxis(axes, 1) > _deadZone;
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_A:
+                    return IsJoystickButtonDown(buttons, 0);
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_B:
+                    return IsJoystickButtonDown(buttons, 1);
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_X:
+                    return IsJoystickButtonDown(buttons, 2);
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_Y:
+                    return IsJoystickButtonDown(buttons, 3);
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_L:
+                    return IsJoystickButtonDown(buttons, 4);
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_R:
+                    return IsJoystickButtonDown(buttons, 5);
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_START:
+                    return IsJoystickButtonDown(buttons, 6);
+                case retro_device_id_joypad.RETRO_DEVICE_ID_JOYPAD_SELECT:
+                    return IsJoystickButtonDown(buttons, 7);
             }
+
+
+            return false;
         }
 
-        return false;
-    }
-
-    private int TestJoystickAxis(JoystickState joystick, int port, int axis)
-    {
-        //Check the "hats" (dpads)
-        foreach (var hat in joystick.Hats)
+        private bool IsJoystickButtonDown(ReadOnlySpan<byte> buttons, int button)
         {
+            return buttons.Length > button ? buttons[button] == Glfw.Constants.GLFW_PRESS : false;
+        }
+
+        private float JoystickAxis(ReadOnlySpan<float> axes, int axis)
+        {
+            return axes.Length > axis ? axes[axis] : 0;
+        }
+
+        private static bool IsJoystickHat(ReadOnlySpan<GlfwJoystickHat> hats, GlfwJoystickHat[] options)
+        {
+            foreach (var hat in hats)
+            {
+                foreach (var option in options)
+                {
+                    if (hat == option)
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static unsafe bool IsJoypadButtonDown(GlfwGamepadState state, GlfwGamepadButton button)
+        {
+            return state.Buttons[(int)button] == Glfw.Constants.GLFW_PRESS;
+        }
+
+
+        public bool Key(int id)
+        {
+            var currentKeyMap = _keyMap;
+            if (KeyDown(GlfwKey.LeftShift) || KeyDown(GlfwKey.RightShift))
+            {
+                currentKeyMap = _keyMapShifted;
+            }
+
+            if (currentKeyMap.TryGetValue((retro_key)id, out var value))
+            {
+                return KeyDown(value);
+            }
+            return false;
+        }
+
+        private bool KeyDown(GlfwKey value)
+        {
+            return _window.GetKey(value) != GlfwKeyAction.Release;
+        }
+
+        //Only one mouse supported
+        public bool MouseButton(int port, int button) => port == 0 && _window.GetMouseButton((GlfwMouseButton)button) == GlfwButtonAction.Press;
+
+        public float MouseDelta(int port, int axis)
+        {
+            float result;
             if (axis == 0)
             {
-                if (hat.Left == ButtonState.Pressed)
-                {
-                    return -1;
-                }
-                if (hat.Right == ButtonState.Pressed)
-                {
-                    return 1;
-                }
+                var cursorX = (int)_window.CursorX;
+                result = ((_lastMouseX - cursorX) * _retro.Width) / _window.Width;
+                _lastMouseX = cursorX;
             }
             else
             {
-                if (hat.Up == ButtonState.Pressed)
-                {
-                    return -1;
-                }
-                if (hat.Down == ButtonState.Pressed)
-                {
-                    return 1;
-                }
+                var cursorY = (int)_window.CursorY;
+                result = ((_lastMouseY - cursorY) * _retro.Height) / _window.Height;
+                _lastMouseY = cursorY;
             }
+            return -result;
         }
 
-        while (axis < joystick.Axes.Length)
+        public float MouseWheelDelta(int port, int axis)
         {
-            var result = joystick.Axes[axis];
-            var index = new Tuple<int, int>(port, axis);
-
-            //We'll consider an axis stable if it's at zero
-            if (_stableJoystickAxes.Contains(index) == false)
-            {
-                //Not stable yet
-                if (result > _axisDeadZone || result < -_axisDeadZone)
-                {
-                    return 0;
-                }
-                _stableJoystickAxes.Add(index);
-            }
-
-            if (result > _axisDeadZone)
-            {
-                return 1;
-            }
-            if (result < -_axisDeadZone)
-            {
-                return -1;
-            }
-            axis += 2;
+            //No support for mouse wheel controls yet
+            return 0;
         }
 
-        return 0;
-    }
-
-    private bool TestJoystickButton(JoystickState joystick, int index)
-    {
-        if (index < joystick.Buttons.Count()
-            && joystick.Buttons[index] == ButtonState.Pressed)
+        public void Poll(Wrapper.retro_keyboard_event_t keyboardEventCallback)
         {
-            return true;
-        }
-        return false;
-    }
+            /* Code from old implementation - still required?
 
-    public bool MouseButton(int port, int button)
-    {
-        //Port is ignored, we don't support multi mice
-        var state = Mouse.GetState();
-
-        var result = button switch
-        {
-            0 => state.LeftButton == ButtonState.Pressed,
-            1 => state.RightButton == ButtonState.Pressed,
-            2 => state.MiddleButton == ButtonState.Pressed,
-            _ => false
-        };
-
-        return result;
-    }
-
-    public float MouseDelta(int port, int axis)
-    {
-        return axis switch
-        {
-            0 => _box.ScaleX(_mouseDeltaX),
-            1 => _box.ScaleY(_mouseDeltaY),
-            _ => 0,
-        };
-    }
-
-    public float MouseWheelDelta(int port, int axis)
-    {
-        return 0;
-    }
-
-    public bool Key(int id)
-    {
-        var state = Keyboard.GetState();
-        var dict = _keyMap;
-        if (state.IsKeyDown(Keys.LeftShift) || state.IsKeyDown(Keys.RightShift))
-        {
-            dict = _keyMapShifted;
-        }
-
-        if (dict.ContainsKey((retro_key)id) == false)
-        {
-            return false;
-        }
-        var mappedKey = dict[(retro_key)id];
-        return state.IsKeyDown(mappedKey);
-
-    }
-
-
-    public void Poll(retro_keyboard_event_t keyboardEventCallback)
-    {
         var mouseState = Mouse.GetState();
         var anyMouse =
             _box.IsMouseOnScreen(mouseState.X, mouseState.Y)
@@ -411,8 +363,6 @@ _keyMap[retro_key.RETROK_OEM_102]
         {
             _mouseDeltaX = 100;
         }
-
-
 
         if (keyboardEventCallback != null)
         {
@@ -446,5 +396,11 @@ _keyMap[retro_key.RETROK_OEM_102]
             _lastPressedKeys = pressedKeys;
         }
     }
-}
 */
+
+        }
+    }
+
+
+
+}

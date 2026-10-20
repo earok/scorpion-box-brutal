@@ -13,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="Ahwoo.BRUTAL.Core" Version="2026.10.1" />
     <PackageReference Include="Ahwoo.BRUTAL.Glfw" Version="2026.10.4" />
+    <PackageReference Include="Ahwoo.BRUTAL.OpenAl" Version="2026.10.2" />
     <PackageReference Include="Ahwoo.BRUTAL.OpenGl" Version="2026.10.1" />
     <PackageReference Include="Ahwoo.BRUTAL.Strings" Version="2026.10.1" />
   </ItemGroup>
