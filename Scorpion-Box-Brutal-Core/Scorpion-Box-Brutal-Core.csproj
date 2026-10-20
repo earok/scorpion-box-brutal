@@ -18,4 +18,10 @@
     <PackageReference Include="Ahwoo.BRUTAL.Strings" Version="2026.10.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="config.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Cores\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Games\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>  
+
 </Project>

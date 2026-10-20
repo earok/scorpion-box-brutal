@@ -32,7 +32,7 @@ namespace ScorpionBox.Windows
 
             State.Window = Glfw.CreateWindow(new GlfwWindow.CreateInfo
             {
-                Title = title,
+                Title = title + " - BRUTAL",
                 Size = new int2((int)width, (int)height),
             });
 
