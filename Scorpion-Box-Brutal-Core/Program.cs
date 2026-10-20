@@ -23,7 +23,7 @@ namespace ScorpionBox
         private GlfwKey _keyVolUp;
         private GlfwKey _keyVolDown;
         private bool _startFullScreen;
-        
+
         public ScorpionBoxGame()
         {
             try
@@ -46,17 +46,16 @@ namespace ScorpionBox
                 var audioProcessor = new ScorpionAudioProcessor(retro);
 
                 var ticks = 0;
-                var startTime = DateTime.Now;
 
                 while (window.IsRunning)
                 {
-                    //Maybe not the smartest way to track time?
-                    var targetTicks = (DateTime.Now - startTime).TotalSeconds * retro.FPS;
+                    var targetTicks = Glfw.Time * (int)retro.Game.SystemAVInfo.timing.fps;
                     while (ticks < targetTicks)
                     {
                         retro.Update();
                         ticks++;
                     }
+
                 }
             }
             catch (Exception ex)
@@ -142,7 +141,7 @@ namespace ScorpionBox
                         break;
 
                     case "fullscreen":
-                        bool.TryParse(value,out _startFullScreen);
+                        bool.TryParse(value, out _startFullScreen);
                         break;
 
                     default:

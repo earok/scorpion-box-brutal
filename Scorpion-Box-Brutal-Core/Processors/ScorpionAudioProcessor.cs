@@ -15,8 +15,8 @@ namespace ScorpionBox.Processors
         private AlBuffer[] _recoveredBuffers;
         private AlSource _source;
         private int _sampleRate;
-        private int _prebufferSamples;
-        Queue<AlBuffer> _freeBuffers = new Queue<AlBuffer>();
+        private int _minSamples;
+        Queue<AlBuffer> _freeBuffers = new();
         private AlBuffer _backBuffer;
 
         public ScorpionAudioProcessor(Wrapper retro)
@@ -46,7 +46,7 @@ namespace ScorpionBox.Processors
             _source = Al.GenSource();
             _sampleRate = sampleRate;
 
-            _prebufferSamples = sampleRate / 100; //Collect 1/100th of a second worth of samples before playing
+            _minSamples = sampleRate / 100; //Collect 1/100th of a second worth of samples before playing
             foreach (var buffer in _buffers)
             {
                 _freeBuffers.Enqueue(buffer);
@@ -59,7 +59,7 @@ namespace ScorpionBox.Processors
             _backBuffer.SetData(AlFormat.StereoFloat32, MemoryMarshal.AsBytes(samples), _sampleRate);
 
             //Haven't collected enough samples yet
-            if (_backBuffer.SampleLength < _prebufferSamples)
+            if (_backBuffer.SampleLength < _minSamples)
             {
                 return;
             }
