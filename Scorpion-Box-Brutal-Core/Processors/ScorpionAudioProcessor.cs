@@ -17,7 +17,7 @@ namespace ScorpionBox.Processors
         private int _sampleRate;
         private int _prebufferSamples;
         Queue<AlBuffer> _freeBuffers = new Queue<AlBuffer>();
-        List<float> _preBuffer = new List<float>();
+        private AlBuffer _backBuffer;
 
         public ScorpionAudioProcessor(Wrapper retro)
         {
@@ -51,12 +51,15 @@ namespace ScorpionBox.Processors
             {
                 _freeBuffers.Enqueue(buffer);
             }
+            _backBuffer = _freeBuffers.Dequeue();
         }
 
         public void ProcessSamples(float[] samples)
         {
-            _preBuffer.AddRange(samples);
-            if (_preBuffer.Count < _prebufferSamples)
+            _backBuffer.SetData(AlFormat.StereoFloat32, MemoryMarshal.AsBytes(samples), _sampleRate);
+
+            //Haven't collected enough samples yet
+            if (_backBuffer.SampleLength < _prebufferSamples)
             {
                 return;
             }
@@ -72,16 +75,14 @@ namespace ScorpionBox.Processors
                 }
             }
 
-            if (_freeBuffers.TryDequeue(out var targetBuffer) == false)
+            //We don't have any free buffers yet, so keep collecting on the back buffer
+            if (_freeBuffers.TryDequeue(out var nextBuffer) == false)
             {
-                //To handle this better, if we're out of buffers. Create new buffer up to limit?
                 return;
             }
 
-            targetBuffer.SetData(AlFormat.StereoFloat32, MemoryMarshal.AsBytes(_preBuffer.ToArray()), _sampleRate);
-            var buffersToUse = new ReadOnlySpan<AlBuffer>(in targetBuffer);
-            _source.QueueBuffers(buffersToUse);
-            _preBuffer.Clear();
+            _source.QueueBuffers(new ReadOnlySpan<AlBuffer>(in _backBuffer));
+            _backBuffer = nextBuffer;
 
             if (_source.State != AlSourceState.Playing)
             {
