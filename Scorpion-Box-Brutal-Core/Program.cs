@@ -1,4 +1,5 @@
 ﻿using Brutal.GlfwApi;
+using Brutal.Numerics;
 using ScorpionBox;
 using ScorpionBox.Processors;
 using ScorpionBox.Windows;
@@ -6,66 +7,114 @@ using SK.Libretro;
 using SK.Libretro.Utilities;
 using static SK.Libretro.Wrapper;
 
-new ScorpionBoxGame();
+var scorpionBox = new ScorpionBoxGame();
+try
+{
+    scorpionBox.Run();
+}
+catch (Exception ex)
+{
+    Console.WriteLine("Fatal error: " + ex.Message);
+}
+finally
+{
+    if (scorpionBox != null)
+    {
+        scorpionBox.Dispose();
+    }
+}
+
 
 namespace ScorpionBox
 {
-
-    public class ScorpionBoxGame
+    public class ScorpionBoxGame : IDisposable
     {
+        public Dictionary<int, Dictionary<retro_device_id_joypad, GlfwKey>> KeyDictionary = [];
+        public WindowWrapper Window;
+        public Wrapper Retro;
+
         private string _core;
         private string _game;
-        public Dictionary<int, Dictionary<retro_device_id_joypad, GlfwKey>> KeyDictionary = [];
         private int _volume = 100;
-        private string _title;
+        private string _title = "BRUTAL";
         private GlfwKey _keyFullscreen;
         private GlfwKey _keyQuit;
         private GlfwKey _keyVolUp;
         private GlfwKey _keyVolDown;
-        private bool _startFullScreen;
+        private bool _isFullScreen;
 
-        public ScorpionBoxGame()
+        public void Run()
         {
-            try
+            if (!Glfw.Init())
             {
-                var dll = new DllModuleWindows();
-                var retro = new Wrapper(".", dll);
+                throw new Exception("Failed to initialize GLFW");
+            }
 
-                var portDevices = new Dictionary<uint, uint>();
-                var coreOptionsList = new CoreOptionsList();
-                ReadConfig(coreOptionsList, portDevices);
+            //Remember the default video mode sizes
+            var monitor = Glfw.PrimaryMonitor;
+            var middleOfScreen = new int2(monitor.VideoMode.Width, monitor.VideoMode.Height) / 2;
 
-                if (retro.StartGame("Cores", _core, "Games", _game, coreOptionsList, portDevices) == false)
+            var dll = new DllModuleWindows();
+            Retro = new Wrapper(".", dll);
+            var portDevices = new Dictionary<uint, uint>();
+            var coreOptionsList = new CoreOptionsList();
+            ReadConfig(coreOptionsList, portDevices);
+
+            if (Retro.StartGame("Cores", _core, "Games", _game, coreOptionsList, portDevices) == false)
+            {
+                throw new Exception("Could not start game");
+            }
+
+            var bestMultiplierWidth = monitor.VideoMode.Width / (int)Retro.Width;
+            var bestMultiplierHeight = monitor.VideoMode.Height / (int)Retro.Height;
+            var bestMultiplier = Math.Min(bestMultiplierWidth,bestMultiplierHeight);
+
+            var size = new int2((int)Retro.Width, (int)Retro.Height) * bestMultiplier;
+            Window = new WindowWrapper(size, _title);
+            _ = new ScorpionGraphicsProcessor(this);
+            _ = new ScorpionInputProcessor(this).SetDeadZone(0.5f);
+            _ = new ScorpionAudioProcessor(this);
+
+            var ticks = 0;
+            var fullscreenKeyState = false;
+
+            while (Window.IsRunning && IsKeyDown(_keyQuit) == false)
+            {
+                var targetTicks = Glfw.Time * (int)Retro.Game.SystemAVInfo.timing.fps;
+                while (ticks < targetTicks)
                 {
-                    throw new Exception("Could not start game");
+                    Retro.Update();
+                    ticks++;
                 }
 
-                using var window = new WindowWrapper(retro.Width * 3, retro.Height * 3, _title);
-                var graphicsProcessor = new ScorpionGraphicsProcessor(retro, window.State.Renderer);
-                var inputProcessor = new ScorpionInputProcessor(this, retro, window.State.Window).SetDeadZone(0.5f);
-                var audioProcessor = new ScorpionAudioProcessor(retro);
-
-                var ticks = 0;
-
-                while (window.IsRunning)
+                if (IsKeyJustPressed(_keyFullscreen, ref fullscreenKeyState))
                 {
-                    var targetTicks = Glfw.Time * (int)retro.Game.SystemAVInfo.timing.fps;
-                    while (ticks < targetTicks)
+
+                    //Regenerate window here
+                    if (Window.State.GlfwWindow.IsFullscreen)
                     {
-                        retro.Update();
-                        ticks++;
+                        Window.State.GlfwWindow.SetWindowed(middleOfScreen - (size / 2), size);
                     }
-
+                    else
+                    {
+                        Window.State.GlfwWindow.SetFullscreen(Glfw.PrimaryMonitor, size, (int)Retro.Game.SystemAVInfo.timing.fps);
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Fatal error: " + ex.Message);
-            }
-            finally
-            {
 
-            }
+        }
+
+        private bool IsKeyJustPressed(GlfwKey key, ref bool lastState)
+        {
+            var newState = IsKeyDown(key);
+            var result = lastState == false && newState == true;
+            lastState = result;
+            return result;
+        }
+
+        private bool IsKeyDown(GlfwKey key)
+        {
+            return Window.State.GlfwWindow.GetKey(key) != GlfwKeyAction.Release;
         }
 
         private void ReadConfig(CoreOptionsList coreOptionsList, Dictionary<uint, uint> portDevices)
@@ -141,7 +190,7 @@ namespace ScorpionBox
                         break;
 
                     case "fullscreen":
-                        bool.TryParse(value, out _startFullScreen);
+                        bool.TryParse(value, out _isFullScreen);
                         break;
 
                     default:
@@ -210,6 +259,16 @@ namespace ScorpionBox
             }
             throw new Exception("Invalid key:" + value);
         }
+
+        public void Dispose()
+        {
+            Window.Dispose();
+            if (Retro != null)
+            {
+                Retro.StopGame();
+            }
+        }
+
     }
 
 }

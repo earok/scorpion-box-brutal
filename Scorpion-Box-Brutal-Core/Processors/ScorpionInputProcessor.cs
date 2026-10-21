@@ -1,4 +1,5 @@
 ﻿using Brutal.GlfwApi;
+using CommunityToolkit.HighPerformance;
 using SK.Libretro;
 using static SK.Libretro.Wrapper;
 
@@ -8,8 +9,6 @@ namespace ScorpionBox.Processors
     internal class ScorpionInputProcessor : IInputProcessor
     {
         private ScorpionBoxGame _box;
-        private Wrapper _retro;
-        private GlfwWindow _window;
 
         private float _deadZone;
         private float _axisDeadZone;
@@ -30,11 +29,12 @@ namespace ScorpionBox.Processors
         private readonly GlfwJoystickHat[] _hatUp = { GlfwJoystickHat.Up, GlfwJoystickHat.LeftUp, GlfwJoystickHat.RightUp };
         private readonly GlfwJoystickHat[] _hatDown = { GlfwJoystickHat.Down, GlfwJoystickHat.LeftDown, GlfwJoystickHat.RightDown };
 
-        public ScorpionInputProcessor(ScorpionBoxGame box, Wrapper retro, GlfwWindow window)
+        private GlfwWindow Window => _box.Window.State.GlfwWindow;
+        public Wrapper Retro => _box.Retro;
+
+        public ScorpionInputProcessor(ScorpionBoxGame box)
         {
             _box = box;
-            _retro = retro;
-            _window = window;
 
             _keyMap[retro_key.RETROK_BACKSPACE] = GlfwKey.Backspace;
             _keyMap[retro_key.RETROK_TAB] = GlfwKey.Tab;
@@ -150,7 +150,7 @@ namespace ScorpionBox.Processors
                 _inversekeyMapShifted[keypair.Value] = keypair.Key;
             }
 
-            _retro.ActivateInput(this);
+            Retro.ActivateInput(this);
         }
 
         public ScorpionInputProcessor SetDeadZone(float deadZone)
@@ -298,25 +298,25 @@ namespace ScorpionBox.Processors
 
         private bool KeyDown(GlfwKey value)
         {
-            return _window.GetKey(value) != GlfwKeyAction.Release;
+            return Window.GetKey(value) != GlfwKeyAction.Release;
         }
 
         //Only one mouse supported
-        public bool MouseButton(int port, int button) => port == 0 && _window.GetMouseButton((GlfwMouseButton)button) == GlfwButtonAction.Press;
+        public bool MouseButton(int port, int button) => port == 0 && Window.GetMouseButton((GlfwMouseButton)button) == GlfwButtonAction.Press;
 
         public float MouseDelta(int port, int axis)
         {
             float result;
             if (axis == 0)
             {
-                var cursorX = (int)_window.CursorX;
-                result = ((_lastMouseX - cursorX) * _retro.Width) / _window.Width;
+                var cursorX = (int)Window.CursorX;
+                result = ((_lastMouseX - cursorX) * Retro.Width) / Window.Width;
                 _lastMouseX = cursorX;
             }
             else
             {
-                var cursorY = (int)_window.CursorY;
-                result = ((_lastMouseY - cursorY) * _retro.Height) / _window.Height;
+                var cursorY = (int)Window.CursorY;
+                result = ((_lastMouseY - cursorY) * Retro.Height) / Window.Height;
                 _lastMouseY = cursorY;
             }
             return -result;

@@ -14,14 +14,9 @@ namespace ScorpionBox.Windows
         private static readonly GlGetProcAddressFunc GetProcAddress = name =>
             Glfw.GetProcAddress(MemoryMarshal.CreateReadOnlySpanFromNullTerminated(name));
 
-        public WindowWrapper(uint width, uint height, string title)
+        public WindowWrapper(int2 size, string title)
         {
             State = new WindowState();
-
-            if (!Glfw.Init())
-            {
-                throw new Exception("Failed to initialize GLFW");
-            }
 
             // OpenGL 3.3 core is the baseline everywhere, forward compatible so macOS accepts it too
             Glfw.WindowHint(GlfwWindowHint.ClientApi, Glfw.Constants.GLFW_OPENGL_API);
@@ -30,13 +25,13 @@ namespace ScorpionBox.Windows
             Glfw.WindowHint(GlfwWindowHint.OpenGlProfile, Glfw.Constants.GLFW_OPENGL_CORE_PROFILE);
             Glfw.WindowHint(GlfwWindowHint.OpenGlForwardCompat, 1);
 
-            State.Window = Glfw.CreateWindow(new GlfwWindow.CreateInfo
+            State.GlfwWindow = Glfw.CreateWindow(new GlfwWindow.CreateInfo
             {
                 Title = title + " - BRUTAL",
-                Size = new int2((int)width, (int)height),
+                Size = size,
             });
 
-            State.Window.MakeContextCurrent();
+            State.GlfwWindow.MakeContextCurrent();
             if (!Glad.Initialize(GetProcAddress))
             {
                 throw new Exception("Failed to load OpenGL functions");
@@ -52,7 +47,7 @@ namespace ScorpionBox.Windows
         {
             get
             {
-                if (State.Window.ShouldClose)
+                if (State.GlfwWindow.ShouldClose)
                 {
                     return false;
                 }
@@ -65,7 +60,7 @@ namespace ScorpionBox.Windows
         public void Dispose()
         {
             State.Renderer.Dispose();
-            State.Window.Dispose();
+            State.GlfwWindow.Dispose();
             Glfw.Terminate();
         }
     }

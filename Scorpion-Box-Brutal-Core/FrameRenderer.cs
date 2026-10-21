@@ -37,6 +37,8 @@ namespace ScorpionBox
         """;
 
         private readonly WindowState _state;
+        private readonly GlShader _vertexShader;
+
         private readonly GlProgram _program;
 
         // Core profile refuses to draw without a vertex array bound, even an empty one
@@ -51,15 +53,15 @@ namespace ScorpionBox
         public FrameRenderer(WindowState state, bool linearFiltering = false)
         {
             _state = state;
-            var vertexShader = OpenGl.CreateShader(GlShaderType.Vertex).SetSource(VertexShaderSource).Compile();
+            _vertexShader = OpenGl.CreateShader(GlShaderType.Vertex).SetSource(VertexShaderSource).Compile();
             var fragmentShader = OpenGl.CreateShader(GlShaderType.Fragment).SetSource(FragmentShaderSource).Compile();
             try
             {
-                _program = OpenGl.CreateProgram().Attach(vertexShader).Attach(fragmentShader).Link();
+                _program = OpenGl.CreateProgram().Attach(_vertexShader).Attach(fragmentShader).Link();
             }
             finally
             {
-                vertexShader.Dispose();
+                _vertexShader.Dispose();
                 fragmentShader.Dispose();
             }
 
@@ -98,13 +100,16 @@ namespace ScorpionBox
             Upload(pixels, width, height, pitch, format);
 
             // Read every frame, so resizes need no special handling
-            var size = _state.Window.FramebufferSize;
+            var size = _state.GlfwWindow.FramebufferSize;
             OpenGl.Viewport(0, 0, size.X, size.Y);
+
+            OpenGl.ClearColor(float4.Zero);
+            OpenGl.Clear(GlClearBit.Color);
 
             _program.Use();
             _vertexArray.Bind();
             OpenGl.Native.glDrawArrays(OpenGl.GL_TRIANGLES, 0, 3);
-            _state.Window.SwapBuffers();
+            _state.GlfwWindow.SwapBuffers();
         }
 
         private void Upload(void* pixels, uint width, uint height, uint pitch, retro_pixel_format format)

@@ -4,7 +4,7 @@ namespace ScorpionBox.Windows
 {
     public class WindowState
     {
-        public GlfwWindow Window;
+        public GlfwWindow GlfwWindow;
         public FrameRenderer Renderer;
     }
 

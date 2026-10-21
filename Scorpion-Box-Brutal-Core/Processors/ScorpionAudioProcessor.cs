@@ -7,21 +7,18 @@ namespace ScorpionBox.Processors
 {
     public class ScorpionAudioProcessor : IAudioProcessor
     {
-        const int Buffers = 4;
-
         private Device _device;
         private Context _context;
-        private AlBuffer[] _buffers;
-        private AlBuffer[] _recoveredBuffers;
+        private List<AlBuffer> _buffers = new();
         private AlSource _source;
         private int _sampleRate;
-        private int _minSamples;
-        Queue<AlBuffer> _freeBuffers = new();
-        private AlBuffer _backBuffer;
+        private AlBuffer _currentBuffer;
 
-        public ScorpionAudioProcessor(Wrapper retro)
+        public ScorpionAudioProcessor(ScorpionBoxGame box)
         {
-            retro.ActivateAudio(this);
+            _device = Alc.OpenDevice();
+            _context = _device.CreateContext();
+            box.Retro.ActivateAudio(this);
         }
 
         public void DeInit()
@@ -38,51 +35,29 @@ namespace ScorpionBox.Processors
 
         public void Init(int sampleRate)
         {
-            _device = Alc.OpenDevice();
-            _context = _device.CreateContext();
             _context.MakeCurrent();
-            _buffers = Al.GenBuffers(Buffers);
-            _recoveredBuffers = new AlBuffer[Buffers];
             _source = Al.GenSource();
             _sampleRate = sampleRate;
-
-            _minSamples = sampleRate / 100; //Collect 1/100th of a second worth of samples before playing
-            foreach (var buffer in _buffers)
-            {
-                _freeBuffers.Enqueue(buffer);
-            }
-            _backBuffer = _freeBuffers.Dequeue();
         }
 
         public void ProcessSamples(float[] samples)
         {
-            _backBuffer.SetData(AlFormat.StereoFloat32, MemoryMarshal.AsBytes(samples), _sampleRate);
-
-            //Haven't collected enough samples yet
-            if (_backBuffer.SampleLength < _minSamples)
-            {
-                return;
-            }
-
-            //Get our old buffers back
+            //Do we have a free buffer? Just reclaim one
             if (_source.BuffersProcessed > 0)
             {
-                var freedBuffers = new Span<AlBuffer>(_recoveredBuffers, 0, _source.BuffersProcessed);
-                _source.UnqueueBuffers(freedBuffers);
-                foreach (var freedBuffer in freedBuffers)
-                {
-                    _freeBuffers.Enqueue(freedBuffer);
-                }
+                var freeBufferSpan = new Span<AlBuffer>(ref _currentBuffer);
+                _source.UnqueueBuffers(freeBufferSpan);
             }
-
-            //We don't have any free buffers yet, so keep collecting on the back buffer
-            if (_freeBuffers.TryDequeue(out var nextBuffer) == false)
+            //Create a new buffer to take our samples
+            //Possible issue if many buffers spawned by many small samples processed at once?
+            else
             {
-                return;
+                _currentBuffer = Al.GenBuffer();
+                _buffers.Add(_currentBuffer);
             }
 
-            _source.QueueBuffers(new ReadOnlySpan<AlBuffer>(in _backBuffer));
-            _backBuffer = nextBuffer;
+            _currentBuffer.SetData(AlFormat.StereoFloat32, MemoryMarshal.AsBytes(samples), _sampleRate);
+            _source.QueueBuffers(new ReadOnlySpan<AlBuffer>(in _currentBuffer));
 
             if (_source.State != AlSourceState.Playing)
             {

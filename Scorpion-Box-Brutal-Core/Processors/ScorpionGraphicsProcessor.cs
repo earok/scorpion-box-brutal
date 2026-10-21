@@ -6,14 +6,12 @@ namespace ScorpionBox.Processors
 
     internal class ScorpionGraphicsProcessor : IGraphicsProcessor
     {
-        private Wrapper _retro;
-        private FrameRenderer _renderer;
+        private ScorpionBoxGame _box;
 
-        public ScorpionGraphicsProcessor(Wrapper retro, FrameRenderer renderer)
+        public ScorpionGraphicsProcessor(ScorpionBoxGame box)
         {
-            _retro = retro;
-            _renderer = renderer;
-            retro.ActivateGraphics(this);
+            _box = box;
+            _box.Retro.ActivateGraphics(this);
         }
 
         public unsafe void ProcessFrame0RGB1555(ushort* data, int width, int height, int pitch)
@@ -27,9 +25,10 @@ namespace ScorpionBox.Processors
 
         private unsafe void FinishFrame(void* data, int width, int height, int pitch)
         {
-            var bytesPerPixel = _retro.Game.PixelFormat.BytesPerPixel();
+            var format = _box.Retro.Game.PixelFormat;
+            var bytesPerPixel = format.BytesPerPixel();
             var pitchInBytes = pitch * bytesPerPixel;
-            _renderer.DrawFrame(data, (uint)width, (uint)height, (uint)pitchInBytes, _retro.Game.PixelFormat);
+            _box.Window.State.Renderer.DrawFrame(data, (uint)width, (uint)height, (uint)pitchInBytes, format);
         }
 
     }
