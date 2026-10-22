@@ -77,10 +77,8 @@ namespace ScorpionBox
             var audio = new ScorpionAudioProcessor(this, _configVolume);
 
             var lastFrameTime = 0.0;
-            var lastLocalFrameTime = 0.0;
             Glfw.SetTime(0);
-
-            var context = ImGui.CreateContext();
+            ImGui.CreateContext();
             ImGui.GetIO().IniFilename = null; // Don't write imgui.ini.
 
             using var glfwBackend = new GlfwBackend(Window.State.GlfwWindow, GlfwBackend.ClientApi.OpenGL);
@@ -95,7 +93,7 @@ namespace ScorpionBox
                 var time = Glfw.Time;
                 var delta = time - lastFrameTime;
                 lastFrameTime = time;
-                
+
                 var targetTicks = (int)(time * Retro.FPS);
                 if (ticks < targetTicks)
                 {
@@ -141,8 +139,7 @@ namespace ScorpionBox
                     // Recycle the scratch memory that interpolated ImGui strings ($"...") use, once per frame.
                     ImString.SharedStorage.Reset();
 
-                    ImGui.SetNextWindowSize(new float2(500, 0));
-                    ImGui.SetNextWindowPos(new float2(0, 0));
+                    ImGui.SetNextWindowSize(new float2(Window.State.GlfwWindow.Width, 0));
                     if (ImGui.Begin("Hello ImGui"u8, ImGuiWindowFlags.NoTitleBar
                         | ImGuiWindowFlags.NoBackground
                         | ImGuiWindowFlags.NoMove
@@ -151,14 +148,17 @@ namespace ScorpionBox
                         if (volumeTime > 0)
                         {
                             int sliderInt = (int)audio.Volume;
-                            if (ImGui.SliderInt("Volume"u8, ref sliderInt, 0, 100))
+                            ImGui.PushItemWidth(-1);
+                            if (ImGui.SliderInt(""u8, ref sliderInt, 0, 100))
                             {
                                 audio.Volume = sliderInt;
                                 volumeTime = guiTime;
                             }
+                            ImGui.PopItemWidth();
                             volumeTime -= delta;
                         }
                     }
+                    ImGui.SetWindowPos(new float2(0, Window.State.GlfwWindow.Height - ImGui.GetWindowHeight()));
                     ImGui.End();
 
                     ImGui.Render();
