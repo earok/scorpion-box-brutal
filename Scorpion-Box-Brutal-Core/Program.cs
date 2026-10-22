@@ -1,4 +1,6 @@
 ﻿using Brutal.GlfwApi;
+using Brutal.ImGuiApi;
+using Brutal.ImGuiApi.Backends;
 using Brutal.Numerics;
 using ScorpionBox;
 using ScorpionBox.Processors;
@@ -18,10 +20,7 @@ catch (Exception ex)
 }
 finally
 {
-    if (scorpionBox != null)
-    {
-        scorpionBox.Dispose();
-    }
+    scorpionBox.Dispose();
 }
 
 
@@ -35,15 +34,16 @@ namespace ScorpionBox
 
         private string _core;
         private string _game;
-        private int _volume = 100;
         private string _title = "BRUTAL";
         private GlfwKey _keyFullscreen;
         private GlfwKey _keyQuit;
         private GlfwKey _keyVolUp;
         private GlfwKey _keyVolDown;
         private bool _isFullScreen;
+        private Dictionary<GlfwKey, bool> _lastKeyState = new Dictionary<GlfwKey, bool>();
+        private int _configVolume = 100;
 
-        public void Run()
+        public unsafe void Run()
         {
             if (!Glfw.Init())
             {
@@ -71,31 +71,40 @@ namespace ScorpionBox
 
             var size = new int2((int)Retro.Width, (int)Retro.Height) * bestMultiplier;
             Window = new WindowWrapper(size, _title);
-            _ = new ScorpionGraphicsProcessor(this);
-            _ = new ScorpionInputProcessor(this).SetDeadZone(0.5f);
-            var audio = new ScorpionAudioProcessor(this);
 
-            var fullscreenKeyState = false;
-            Retro.Update();
+            var graphics = new ScorpionGraphicsProcessor(this);
+            _ = new ScorpionInputProcessor(this).SetDeadZone(0.5f);
+            var audio = new ScorpionAudioProcessor(this, _configVolume);
 
             var lastFrameTime = 0.0;
+            var lastLocalFrameTime = 0.0;
             Glfw.SetTime(0);
+
+            var context = ImGui.CreateContext();
+            ImGui.GetIO().IniFilename = null; // Don't write imgui.ini.
+
+            using var glfwBackend = new GlfwBackend(Window.State.GlfwWindow, GlfwBackend.ClientApi.OpenGL);
+            using var openGlBackend = new OpenGlBackend();
+
+            var volumeTime = 0.0;
+            var guiTime = 3;
+            var ticks = 0;
 
             while (Window.IsRunning && IsKeyDown(_keyQuit) == false)
             {
                 var time = Glfw.Time;
                 var delta = time - lastFrameTime;
-                if (delta * (int)Retro.Game.SystemAVInfo.timing.fps < 1)
-                {
-                    //Ahead of a frame
-                    continue;
-                }
                 lastFrameTime = time;
-
-                Retro.Update();
+                
+                var targetTicks = (int)(time * Retro.FPS);
+                if (ticks < targetTicks)
+                {
+                    Retro.Update();
+                    ticks = targetTicks; //Skip over slow frames
+                }
 
                 //Toggle fullscreen
-                if (IsKeyJustPressed(_keyFullscreen, ref fullscreenKeyState))
+                if (IsKeyJustPressed(_keyFullscreen))
                 {
                     //Regenerate window here
                     _isFullScreen = !_isFullScreen;
@@ -111,15 +120,67 @@ namespace ScorpionBox
                         Window.State.GlfwWindow.SetWindowed((fullscreenSize / 2) - (size / 2), size);
                     }
                 }
+
+                if (IsKeyDown(_keyVolUp))
+                {
+                    audio.Volume += (float)(delta * 100);
+                    volumeTime = guiTime;
+                }
+                if (IsKeyDown(_keyVolDown))
+                {
+                    audio.Volume -= (float)(delta * 100);
+                    volumeTime = guiTime;
+                }
+
+                //We've received a new graphics buffer
+                if (graphics.Pixels != null)
+                {
+                    glfwBackend.NewFrame();
+                    openGlBackend.NewFrame();
+                    ImGui.NewFrame();
+                    // Recycle the scratch memory that interpolated ImGui strings ($"...") use, once per frame.
+                    ImString.SharedStorage.Reset();
+
+                    ImGui.SetNextWindowSize(new float2(500, 0));
+                    ImGui.SetNextWindowPos(new float2(0, 0));
+                    if (ImGui.Begin("Hello ImGui"u8, ImGuiWindowFlags.NoTitleBar
+                        | ImGuiWindowFlags.NoBackground
+                        | ImGuiWindowFlags.NoMove
+                        | ImGuiWindowFlags.NoResize))
+                    {
+                        if (volumeTime > 0)
+                        {
+                            int sliderInt = (int)audio.Volume;
+                            if (ImGui.SliderInt("Volume"u8, ref sliderInt, 0, 100))
+                            {
+                                audio.Volume = sliderInt;
+                                volumeTime = guiTime;
+                            }
+                            volumeTime -= delta;
+                        }
+                    }
+                    ImGui.End();
+
+                    ImGui.Render();
+
+                    var bytesPerPixel = Retro.Game.PixelFormat.BytesPerPixel();
+                    var pitchInBytes = graphics.Pitch * bytesPerPixel;
+                    Window.State.Renderer.DrawFrame(graphics.Pixels, (uint)graphics.Width, (uint)graphics.Height, (uint)pitchInBytes, Retro.Game.PixelFormat);
+                    openGlBackend.RenderDrawData(ImGui.GetDrawData());
+                    Window.State.GlfwWindow.SwapBuffers();
+                }
+
+
             }
 
         }
 
-        private bool IsKeyJustPressed(GlfwKey key, ref bool lastState)
+        private bool IsKeyJustPressed(GlfwKey key)
         {
+            _lastKeyState.TryGetValue(key, out var lastState);
             var newState = IsKeyDown(key);
             var result = lastState == false && newState == true;
-            lastState = newState;
+            _lastKeyState[key] = newState;
             return result;
         }
 
@@ -180,7 +241,7 @@ namespace ScorpionBox
                     case "volume":
                         if (int.TryParse(value, out var vol))
                         {
-                            _volume = vol;
+                            _configVolume = vol;
                         }
                         break;
 
@@ -281,6 +342,7 @@ namespace ScorpionBox
             {
                 Retro.StopGame();
             }
+            Glfw.Terminate();
         }
 
     }

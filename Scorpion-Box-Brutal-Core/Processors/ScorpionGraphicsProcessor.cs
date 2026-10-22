@@ -7,6 +7,10 @@ namespace ScorpionBox.Processors
     internal class ScorpionGraphicsProcessor : IGraphicsProcessor
     {
         private ScorpionBoxGame _box;
+        public unsafe void* Pixels;
+        public int Width;
+        public int Height;
+        public int Pitch;
 
         public ScorpionGraphicsProcessor(ScorpionBoxGame box)
         {
@@ -25,10 +29,10 @@ namespace ScorpionBox.Processors
 
         private unsafe void FinishFrame(void* data, int width, int height, int pitch)
         {
-            var format = _box.Retro.Game.PixelFormat;
-            var bytesPerPixel = format.BytesPerPixel();
-            var pitchInBytes = pitch * bytesPerPixel;
-            _box.Window.State.Renderer.DrawFrame(data, (uint)width, (uint)height, (uint)pitchInBytes, format);
+            Width = width;
+            Height = height;
+            Pitch = pitch;
+            Pixels = data;
         }
 
     }

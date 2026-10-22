@@ -2,6 +2,8 @@
 using SK.Libretro;
 using Brutal.OpenAlApi;
 using System.Runtime.InteropServices;
+using Brutal.OpenAlApi.Params;
+using LibRetroFE_WrapperOnly.Compatibility;
 
 namespace ScorpionBox.Processors
 {
@@ -15,11 +17,26 @@ namespace ScorpionBox.Processors
         private int _sampleRate;
         private AlBuffer _currentBuffer;
 
-        public ScorpionAudioProcessor(ScorpionBoxGame box)
+        public ScorpionAudioProcessor(ScorpionBoxGame box, float defaultVolume)
         {
             _device = Alc.OpenDevice();
             _context = _device.CreateContext();
+            _context.MakeCurrent();
+            _source = Al.GenSource();
+            Volume = defaultVolume;
             box.Retro.ActivateAudio(this);
+        }
+
+        public float Volume
+        {
+            get
+            {
+                return _source.Gain * 100f;
+            }
+            set
+            {
+                _source.Gain = Math.Clamp(value / 100f, 0, 1);
+            }
         }
 
         public void DeInit()
@@ -36,8 +53,6 @@ namespace ScorpionBox.Processors
 
         public void Init(int sampleRate)
         {
-            _context.MakeCurrent();
-            _source = Al.GenSource();
             _sampleRate = sampleRate;
         }
 
@@ -67,7 +82,7 @@ namespace ScorpionBox.Processors
             if (_source.State != AlSourceState.Playing)
             {
                 _source.Play();
-            }            
+            }
         }
     }
 }

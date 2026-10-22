@@ -3,8 +3,8 @@ title=Amigo The Fox
 fullscreen=false
 
 #Uncomment ONE of these cores
-core=puae #Default core for Amiga
-#core=blastem #Default core for Mega Drive
+#core=puae #Default core for Amiga
+core=blastem #Default core for Mega Drive
 #core=geolith #Default core for NeoGeo
 #core=prboom
 

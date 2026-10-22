@@ -133,7 +133,6 @@ namespace ScorpionBox
             _program.Use();
             _vertexArray.Bind();
             OpenGl.Native.glDrawArrays(OpenGl.GL_TRIANGLE_STRIP, 0, 4);
-            _state.GlfwWindow.SwapBuffers();
         }
 
         private void Upload(void* pixels, uint width, uint height, uint pitch, retro_pixel_format format)
