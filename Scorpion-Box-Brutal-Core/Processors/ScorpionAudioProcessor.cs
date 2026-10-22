@@ -9,7 +9,7 @@ namespace ScorpionBox.Processors
     {
         private Device _device;
         private Context _context;
-        private List<AlBuffer> _buffers = new();
+        private List<AlBuffer> _buffers = [];
         private AlSource _source;
         private int _sampleRate;
         private AlBuffer _currentBuffer;

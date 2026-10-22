@@ -67,29 +67,35 @@ namespace ScorpionBox
 
             var bestMultiplierWidth = monitor.VideoMode.Width / (int)Retro.Width;
             var bestMultiplierHeight = monitor.VideoMode.Height / (int)Retro.Height;
-            var bestMultiplier = Math.Min(bestMultiplierWidth,bestMultiplierHeight);
+            var bestMultiplier = Math.Min(bestMultiplierWidth, bestMultiplierHeight);
 
             var size = new int2((int)Retro.Width, (int)Retro.Height) * bestMultiplier;
             Window = new WindowWrapper(size, _title);
             _ = new ScorpionGraphicsProcessor(this);
             _ = new ScorpionInputProcessor(this).SetDeadZone(0.5f);
-            _ = new ScorpionAudioProcessor(this);
+            var audio = new ScorpionAudioProcessor(this);
 
-            var ticks = 0;
             var fullscreenKeyState = false;
+            Retro.Update();
+
+            var lastFrameTime = 0.0;
 
             while (Window.IsRunning && IsKeyDown(_keyQuit) == false)
             {
-                var targetTicks = Glfw.Time * (int)Retro.Game.SystemAVInfo.timing.fps;
-                while (ticks < targetTicks)
+                var time = Glfw.Time;
+                var delta = time - lastFrameTime;
+                if(delta * (int)Retro.Game.SystemAVInfo.timing.fps < 1)
                 {
-                    Retro.Update();
-                    ticks++;
+                    //Ahead of a frame
+                    continue;
                 }
+                lastFrameTime = time;
 
+                Retro.Update();
+
+                //Toggle fullscreen
                 if (IsKeyJustPressed(_keyFullscreen, ref fullscreenKeyState))
                 {
-
                     //Regenerate window here
                     if (Window.State.GlfwWindow.IsFullscreen)
                     {
