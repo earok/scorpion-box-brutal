@@ -52,7 +52,7 @@ namespace ScorpionBox
 
             //Remember the default video mode sizes
             var monitor = Glfw.PrimaryMonitor;
-            var middleOfScreen = new int2(monitor.VideoMode.Width, monitor.VideoMode.Height) / 2;
+            var fullscreenSize = new int2(monitor.VideoMode.Width, monitor.VideoMode.Height);
 
             var dll = new DllModuleWindows();
             Retro = new Wrapper(".", dll);
@@ -84,7 +84,7 @@ namespace ScorpionBox
             {
                 var time = Glfw.Time;
                 var delta = time - lastFrameTime;
-                if(delta * (int)Retro.Game.SystemAVInfo.timing.fps < 1)
+                if (delta * (int)Retro.Game.SystemAVInfo.timing.fps < 1)
                 {
                     //Ahead of a frame
                     continue;
@@ -97,13 +97,17 @@ namespace ScorpionBox
                 if (IsKeyJustPressed(_keyFullscreen, ref fullscreenKeyState))
                 {
                     //Regenerate window here
-                    if (Window.State.GlfwWindow.IsFullscreen)
+                    _isFullScreen = !_isFullScreen;
+                    if (_isFullScreen)
                     {
-                        Window.State.GlfwWindow.SetWindowed(middleOfScreen - (size / 2), size);
+                        Window.State.GlfwWindow.SetAttribute(GlfwWindowAttribute.Decorated, 0);
+                        //Extra size is to force out of DMWW
+                        Window.State.GlfwWindow.SetWindowed(int2.Zero, fullscreenSize + new int2(0,1));
                     }
                     else
                     {
-                        Window.State.GlfwWindow.SetFullscreen(Glfw.PrimaryMonitor, size, (int)Retro.Game.SystemAVInfo.timing.fps);
+                        Window.State.GlfwWindow.SetAttribute(GlfwWindowAttribute.Decorated, 1);
+                        Window.State.GlfwWindow.SetWindowed((fullscreenSize / 2) - (size / 2), size);
                     }
                 }
             }
@@ -114,7 +118,7 @@ namespace ScorpionBox
         {
             var newState = IsKeyDown(key);
             var result = lastState == false && newState == true;
-            lastState = result;
+            lastState = newState;
             return result;
         }
 
@@ -268,7 +272,10 @@ namespace ScorpionBox
 
         public void Dispose()
         {
-            Window.Dispose();
+            if (Window != null)
+            {
+                Window.Dispose();
+            }
             if (Retro != null)
             {
                 Retro.StopGame();

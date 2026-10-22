@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Brutal;
 using Brutal.GlfwApi;
 using Brutal.Numerics;
 using Brutal.OpenGlApi;
@@ -18,12 +19,14 @@ namespace ScorpionBox.Windows
         {
             State = new WindowState();
 
-            // OpenGL 3.3 core is the baseline everywhere, forward compatible so macOS accepts it too
-            Glfw.WindowHint(GlfwWindowHint.ClientApi, Glfw.Constants.GLFW_OPENGL_API);
-            Glfw.WindowHint(GlfwWindowHint.ContextVersionMajor, 3);
-            Glfw.WindowHint(GlfwWindowHint.ContextVersionMinor, 3);
+            Glfw.WindowHint(GlfwWindowHint.ContextVersionMajor, 4);
+            Glfw.WindowHint(GlfwWindowHint.ContextVersionMinor, 1);
             Glfw.WindowHint(GlfwWindowHint.OpenGlProfile, Glfw.Constants.GLFW_OPENGL_CORE_PROFILE);
-            Glfw.WindowHint(GlfwWindowHint.OpenGlForwardCompat, 1);
+
+            if (Platform.IsMacOS)
+            {
+                Glfw.WindowHint(GlfwWindowHint.OpenGlForwardCompat, 1);
+            }
 
             State.GlfwWindow = Glfw.CreateWindow(new GlfwWindow.CreateInfo
             {

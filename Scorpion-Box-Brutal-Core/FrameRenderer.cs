@@ -5,24 +5,19 @@ using static SK.Libretro.Wrapper;
 
 namespace ScorpionBox
 {
-
-    /// <summary>
-    /// OpenGL renderer that uploads a CPU-side framebuffer each frame and stretches it over the whole window
-    /// </summary>
     public sealed unsafe class FrameRenderer : IDisposable
     {
-        // Fullscreen triangle generated from the vertex index, no vertex buffer needed.
-        // GL's clip space is bottom-up while the frame's first row is the top, so V is flipped.
         private const string VertexShaderSource = """
-        #version 330 core
-        out vec2 uv;
-
-        void main() {
-            vec2 pos = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
-            uv = vec2(pos.x, 1.0 - pos.y);
-            gl_Position = vec4(pos * 2.0 - 1.0, 0.0, 1.0);
-        }
-        """;
+            #version 330 core
+            layout (location = 0) in vec2 aPos;
+            layout (location = 1) in vec2 aUv;
+            out vec2 uv;
+            void main()
+            {
+                uv = aUv;
+                gl_Position = vec4(aPos, 0.0, 1.0);
+            }
+            """;
 
         // Alpha is forced to 1 since the X channel of the source formats is undefined
         private const string FragmentShaderSource = """
@@ -36,15 +31,16 @@ namespace ScorpionBox
         }
         """;
 
-        private readonly WindowState _state;
-        private readonly GlShader _vertexShader;
 
+        private readonly WindowState _state;
         private readonly GlProgram _program;
 
         // Core profile refuses to draw without a vertex array bound, even an empty one
         private readonly GlVertexArray _vertexArray;
+        private readonly GlBuffer _vertexBuffer;
 
         // The texture the frame is sampled from, reallocated whenever the frame size or format changes
+
         private readonly GlTexture _texture;
         private retro_pixel_format _textureFormat;
         private uint _textureWidth;
@@ -53,19 +49,24 @@ namespace ScorpionBox
         public FrameRenderer(WindowState state, bool linearFiltering = false)
         {
             _state = state;
-            _vertexShader = OpenGl.CreateShader(GlShaderType.Vertex).SetSource(VertexShaderSource).Compile();
+            var vertexShader = OpenGl.CreateShader(GlShaderType.Vertex).SetSource(VertexShaderSource).Compile();
             var fragmentShader = OpenGl.CreateShader(GlShaderType.Fragment).SetSource(FragmentShaderSource).Compile();
-            try
-            {
-                _program = OpenGl.CreateProgram().Attach(_vertexShader).Attach(fragmentShader).Link();
-            }
-            finally
-            {
-                _vertexShader.Dispose();
-                fragmentShader.Dispose();
-            }
-
+            _program = OpenGl.CreateProgram().Attach(vertexShader).Attach(fragmentShader).Link();
             _vertexArray = OpenGl.GenVertexArray();
+            _vertexArray.Bind();
+
+            vertexShader.Dispose();
+            fragmentShader.Dispose();
+
+            _vertexBuffer = OpenGl.GenBuffer();
+            _vertexBuffer.Bind(GlBindTarget.ArrayBuffer);
+
+            OpenGl.VertexAttribute(new GlAttribute(0, 2, OpenGl.GL_FLOAT, GlScaling.Float, sizeof(Vertex), 0));
+            OpenGl.VertexAttribute(
+                new GlAttribute(1, 2, OpenGl.GL_FLOAT, GlScaling.Float, sizeof(Vertex), sizeof(float2))
+            );
+            OpenGl.EnableVertexAttribArray(0);
+            OpenGl.EnableVertexAttribArray(1);
 
             GlTexture texture;
             OpenGl.GenTextures(new ReadOnlySpan<GlTexture>(&texture, 1));
@@ -79,8 +80,9 @@ namespace ScorpionBox
             OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_WRAP_T, (int)OpenGl.GL_CLAMP_TO_EDGE);
             OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MAX_LEVEL, 0);
 
-            // Rows are addressed by GL_UNPACK_ROW_LENGTH, so don't let GL round row strides up
             OpenGl.PixelStorei(OpenGl.GL_UNPACK_ALIGNMENT, 1);
+
+            OpenGl.ClearColor(float4.Zero);
         }
 
         private static (uint InternalFormat, uint Format, uint Type) GetFormatInfo(retro_pixel_format format)
@@ -96,19 +98,41 @@ namespace ScorpionBox
 
         public void DrawFrame(void* pixels, uint width, uint height, uint pitch, retro_pixel_format format)
         {
-            OpenGl.BindTexture(OpenGl.GL_TEXTURE_2D, _texture.Id);
-            Upload(pixels, width, height, pitch, format);
-
             // Read every frame, so resizes need no special handling
             var size = _state.GlfwWindow.FramebufferSize;
+
+            var textureAspect = width / (float)height;
+            var screenAspect = size.X / (float)size.Y;
+            var xAspect = textureAspect / screenAspect;
+            var yAspect = 1f;
+
+            if (xAspect > 1)
+            {
+                yAspect = 1 / xAspect;
+                xAspect = 1;
+            }
+
+            OpenGl.BufferData(
+                GlBindTarget.ArrayBuffer,
+                new Vertex[]
+                {
+                    new(new float2(-xAspect, -yAspect), new float2(0.0f, 1.0f)),
+                    new(new float2( xAspect, -yAspect), new float2(1.0f, 1.0f)),
+                    new(new float2(-xAspect,  yAspect), new float2(0.0f, 0.0f)),
+                    new(new float2( xAspect,  yAspect), new float2(1.0f, 0.0f)),
+                },
+                GlBufferUsage.StaticDraw
+            );
+
+            OpenGl.BindTexture(OpenGl.GL_TEXTURE_2D, _texture.Id);
+            Upload(pixels, width, height, pitch, format);
             OpenGl.Viewport(0, 0, size.X, size.Y);
 
-            OpenGl.ClearColor(float4.Zero);
             OpenGl.Clear(GlClearBit.Color);
 
             _program.Use();
             _vertexArray.Bind();
-            OpenGl.Native.glDrawArrays(OpenGl.GL_TRIANGLES, 0, 3);
+            OpenGl.Native.glDrawArrays(OpenGl.GL_TRIANGLE_STRIP, 0, 4);
             _state.GlfwWindow.SwapBuffers();
         }
 
@@ -130,10 +154,13 @@ namespace ScorpionBox
 
         public void Dispose()
         {
+            OpenGl.DeleteVertexArrays([_vertexArray]);
+            OpenGl.DeleteBuffers([_vertexBuffer]);
             OpenGl.DeleteTextures(new ReadOnlySpan<GlTexture>(in _texture));
-            OpenGl.DeleteVertexArrays(new ReadOnlySpan<GlVertexArray>(in _vertexArray));
             _program.Dispose();
         }
     }
+
+    record struct Vertex(float2 Position, float2 UV);
 
 }
