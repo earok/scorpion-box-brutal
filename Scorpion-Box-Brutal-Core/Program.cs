@@ -79,6 +79,7 @@ namespace ScorpionBox
             Retro.Update();
 
             var lastFrameTime = 0.0;
+            Glfw.SetTime(0);
 
             while (Window.IsRunning && IsKeyDown(_keyQuit) == false)
             {
@@ -101,8 +102,8 @@ namespace ScorpionBox
                     if (_isFullScreen)
                     {
                         Window.State.GlfwWindow.SetAttribute(GlfwWindowAttribute.Decorated, 0);
-                        //Extra size is to force out of DMWW
-                        Window.State.GlfwWindow.SetWindowed(int2.Zero, fullscreenSize + new int2(0,1));
+                        //Extra size is to force out of DMW
+                        Window.State.GlfwWindow.SetWindowed(int2.Zero - new int2(0, 1), fullscreenSize + new int2(0, 2));
                     }
                     else
                     {

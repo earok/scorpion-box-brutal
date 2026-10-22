@@ -92,8 +92,6 @@ namespace SK.Libretro
             }
 
             Core.retro_run();
-
-
         }
 
         public void ActivateGraphics(IGraphicsProcessor graphicsProcessor)
