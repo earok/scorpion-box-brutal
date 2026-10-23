@@ -50,10 +50,6 @@ namespace ScorpionBox
                 throw new Exception("Failed to initialize GLFW");
             }
 
-            //Remember the default video mode sizes
-            var monitor = Glfw.PrimaryMonitor;
-            var fullscreenSize = new int2(monitor.VideoMode.Width, monitor.VideoMode.Height);
-
             var dll = new DllModuleWindows();
             Retro = new Wrapper(".", dll);
             var portDevices = new Dictionary<uint, uint>();
@@ -65,12 +61,7 @@ namespace ScorpionBox
                 throw new Exception("Could not start game");
             }
 
-            var bestMultiplierWidth = monitor.VideoMode.Width / (int)Retro.Width;
-            var bestMultiplierHeight = monitor.VideoMode.Height / (int)Retro.Height;
-            var bestMultiplier = Math.Min(bestMultiplierWidth, bestMultiplierHeight);
-
-            var size = new int2((int)Retro.Width, (int)Retro.Height) * bestMultiplier;
-            Window = new WindowWrapper(size, _title);
+            Window = new WindowWrapper(Retro, _title, _isFullScreen);
 
             var graphics = new ScorpionGraphicsProcessor(this);
             _ = new ScorpionInputProcessor(this).SetDeadZone(0.5f);
@@ -104,19 +95,7 @@ namespace ScorpionBox
                 //Toggle fullscreen
                 if (IsKeyJustPressed(_keyFullscreen))
                 {
-                    //Regenerate window here
-                    _isFullScreen = !_isFullScreen;
-                    if (_isFullScreen)
-                    {
-                        Window.State.GlfwWindow.SetAttribute(GlfwWindowAttribute.Decorated, 0);
-                        //Extra size is to force out of DMW
-                        Window.State.GlfwWindow.SetWindowed(int2.Zero - new int2(0, 1), fullscreenSize + new int2(0, 2));
-                    }
-                    else
-                    {
-                        Window.State.GlfwWindow.SetAttribute(GlfwWindowAttribute.Decorated, 1);
-                        Window.State.GlfwWindow.SetWindowed((fullscreenSize / 2) - (size / 2), size);
-                    }
+                    Window.ToggleFullscreen();
                 }
 
                 if (IsKeyDown(_keyVolUp))

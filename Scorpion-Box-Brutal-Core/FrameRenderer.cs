@@ -99,8 +99,9 @@ namespace ScorpionBox
         public void DrawFrame(void* pixels, uint width, uint height, uint pitch, retro_pixel_format format)
         {
             // Read every frame, so resizes need no special handling
-            var size = _state.GlfwWindow.FramebufferSize;
+            var size = _state.GlfwWindow.FramebufferSize;            
 
+            /*
             var textureAspect = width / (float)height;
             var screenAspect = size.X / (float)size.Y;
             var xAspect = textureAspect / screenAspect;
@@ -111,6 +112,13 @@ namespace ScorpionBox
                 yAspect = 1 / xAspect;
                 xAspect = 1;
             }
+            */
+
+            var intScaleX = size.X / width;
+            var intScaleY = size.Y / height;
+            var minScale = Math.Min(intScaleX, intScaleY);
+            var xAspect = (width * minScale) / (float)size.X;
+            var yAspect = (height * minScale) / (float)size.Y;
 
             OpenGl.BufferData(
                 GlBindTarget.ArrayBuffer,
