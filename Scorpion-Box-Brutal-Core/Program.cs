@@ -2,8 +2,13 @@
 using Brutal.ImGuiApi;
 using Brutal.ImGuiApi.Backends;
 using Brutal.Numerics;
+using Brutal.OpenGlApi;
+using Brutal.TextureApi;
+using Brutal.TextureApi.Gli;
+using Brutal.VulkanApi.Abstractions;
 using ScorpionBox;
 using ScorpionBox.Processors;
+using ScorpionBox.Services;
 using ScorpionBox.Windows;
 using SK.Libretro;
 using SK.Libretro.Utilities;
@@ -42,6 +47,7 @@ namespace ScorpionBox
         private bool _isFullScreen;
         private Dictionary<GlfwKey, bool> _lastKeyState = new Dictionary<GlfwKey, bool>();
         private int _configVolume = 100;
+        public TextureService TextureService = new();
 
         public unsafe void Run()
         {
@@ -61,8 +67,7 @@ namespace ScorpionBox
                 throw new Exception("Could not start game");
             }
 
-            Window = new WindowWrapper(Retro, _title, _isFullScreen);
-
+            Window = new WindowWrapper(this, _title, _isFullScreen);
             var graphics = new ScorpionGraphicsProcessor(this);
             _ = new ScorpionInputProcessor(this).SetDeadZone(0.5f);
             var audio = new ScorpionAudioProcessor(this, _configVolume);
@@ -75,6 +80,7 @@ namespace ScorpionBox
             using var glfwBackend = new GlfwBackend(Window.State.GlfwWindow, GlfwBackend.ClientApi.OpenGL);
             using var openGlBackend = new OpenGlBackend();
 
+            var (logoRef, logoSize) = TextureService.FromFile("./Media/LOGO_BRUTAL_WHT.png");
             var volumeTime = 0.0;
             var guiTime = 3;
             var ticks = 0;
@@ -136,6 +142,11 @@ namespace ScorpionBox
                             ImGui.PopItemWidth();
                             volumeTime -= delta;
                         }
+
+                        if (time < 3)
+                        {
+                            ImGui.Image(logoRef, logoSize);
+                        }
                     }
                     ImGui.SetWindowPos(new float2(0, Window.State.GlfwWindow.Height - ImGui.GetWindowHeight()));
                     ImGui.End();
@@ -151,6 +162,7 @@ namespace ScorpionBox
 
 
             }
+
 
         }
 
@@ -313,6 +325,7 @@ namespace ScorpionBox
 
         public void Dispose()
         {
+            TextureService.Dispose();
             if (Window != null)
             {
                 Window.Dispose();

@@ -1,5 +1,6 @@
 using Brutal.Numerics;
 using Brutal.OpenGlApi;
+using CommunityToolkit.HighPerformance;
 using ScorpionBox.Windows;
 using static SK.Libretro.Wrapper;
 
@@ -32,7 +33,6 @@ namespace ScorpionBox
         """;
 
 
-        private readonly WindowState _state;
         private readonly GlProgram _program;
 
         // Core profile refuses to draw without a vertex array bound, even an empty one
@@ -45,10 +45,11 @@ namespace ScorpionBox
         private retro_pixel_format _textureFormat;
         private uint _textureWidth;
         private uint _textureHeight;
+        private ScorpionBoxGame _box;
 
-        public FrameRenderer(WindowState state, bool linearFiltering = false)
+        public FrameRenderer(ScorpionBoxGame box)
         {
-            _state = state;
+            _box = box;
             var vertexShader = OpenGl.CreateShader(GlShaderType.Vertex).SetSource(VertexShaderSource).Compile();
             var fragmentShader = OpenGl.CreateShader(GlShaderType.Fragment).SetSource(FragmentShaderSource).Compile();
             _program = OpenGl.CreateProgram().Attach(vertexShader).Attach(fragmentShader).Link();
@@ -68,11 +69,9 @@ namespace ScorpionBox
             OpenGl.EnableVertexAttribArray(0);
             OpenGl.EnableVertexAttribArray(1);
 
-            GlTexture texture;
-            OpenGl.GenTextures(new ReadOnlySpan<GlTexture>(&texture, 1));
-            _texture = texture;
+            _texture = _box.TextureService.GenerateTexture();
 
-            var filter = (int)(linearFiltering ? OpenGl.GL_LINEAR : OpenGl.GL_NEAREST);
+            var filter = (int)OpenGl.GL_LINEAR;
             OpenGl.BindTexture(OpenGl.GL_TEXTURE_2D, _texture.Id);
             OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MIN_FILTER, filter);
             OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MAG_FILTER, filter);
@@ -81,7 +80,6 @@ namespace ScorpionBox
             OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MAX_LEVEL, 0);
 
             OpenGl.PixelStorei(OpenGl.GL_UNPACK_ALIGNMENT, 1);
-
             OpenGl.ClearColor(float4.Zero);
         }
 
@@ -99,7 +97,7 @@ namespace ScorpionBox
         public void DrawFrame(void* pixels, uint width, uint height, uint pitch, retro_pixel_format format)
         {
             // Read every frame, so resizes need no special handling
-            var size = _state.GlfwWindow.FramebufferSize;            
+            var size = _box.Window.State.GlfwWindow.FramebufferSize;
 
             /*
             var textureAspect = width / (float)height;

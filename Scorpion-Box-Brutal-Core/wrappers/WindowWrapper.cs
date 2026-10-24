@@ -19,7 +19,7 @@ namespace ScorpionBox.Windows
         private static readonly GlGetProcAddressFunc GetProcAddress = name =>
             Glfw.GetProcAddress(MemoryMarshal.CreateReadOnlySpanFromNullTerminated(name));
 
-        public WindowWrapper(Wrapper retro, string title, bool fullscreen)
+        public WindowWrapper(ScorpionBoxGame box, string title, bool fullscreen)
         {
             State = new WindowState();
             _fullscreen = fullscreen;
@@ -27,8 +27,8 @@ namespace ScorpionBox.Windows
             //Remember the default video mode sizes
             var monitor = Glfw.PrimaryMonitor;
             _fullscreenSize = new int2(monitor.VideoMode.Width, monitor.VideoMode.Height);
-            var bestMultiplierWidth = monitor.VideoMode.Width / (int)retro.Width;
-            var bestMultiplierHeight = monitor.VideoMode.Height / (int)retro.Height;
+            var bestMultiplierWidth = monitor.VideoMode.Width / (int)box.Retro.Width;
+            var bestMultiplierHeight = monitor.VideoMode.Height / (int)box.Retro.Height;
             var bestMultiplier = Math.Min(bestMultiplierWidth, bestMultiplierHeight);
 
             Glfw.WindowHint(GlfwWindowHint.ContextVersionMajor, 4);
@@ -40,12 +40,12 @@ namespace ScorpionBox.Windows
                 Glfw.WindowHint(GlfwWindowHint.OpenGlForwardCompat, 1);
             }
 
-            _oldSize = new int2((int)retro.Width * bestMultiplier, (int)retro.Height * bestMultiplier);
+            _oldSize = new int2((int)box.Retro.Width * bestMultiplier, (int)box.Retro.Height * bestMultiplier);
             _oldPosition = (_fullscreenSize / 2) - (_oldSize / 2);
 
             State.GlfwWindow = Glfw.CreateWindow(new GlfwWindow.CreateInfo
             {
-                Title = title + " - BRUTAL",
+                Title = title,
                 Size = _oldSize,
             });
 
@@ -60,7 +60,7 @@ namespace ScorpionBox.Windows
             // Vsync
             Glfw.SwapInterval(1);
 
-            State.Renderer = new FrameRenderer(State);
+            State.Renderer = new FrameRenderer(box);
         }
 
         public bool IsRunning
