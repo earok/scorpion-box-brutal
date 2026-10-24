@@ -13,11 +13,8 @@ namespace ScorpionBox.Processors
         private float _deadZone;
         private float _axisDeadZone;
         private HashSet<Tuple<int, int>> _stableJoystickAxes = [];
-        //    private Keys[] _lastPressedKeys = [];
         private int _lastMouseX;
         private int _lastMouseY;
-        private float _mouseDeltaX;
-        private float _mouseDeltaY;
 
         private Dictionary<retro_key, GlfwKey> _keyMap = [];
         private Dictionary<retro_key, GlfwKey> _keyMapShifted = [];

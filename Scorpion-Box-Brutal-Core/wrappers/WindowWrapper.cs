@@ -20,6 +20,11 @@ namespace ScorpionBox.Windows
 
         public WindowWrapper(ScorpionBoxGame box, string title, bool fullscreen)
         {
+            if(box.Retro == null)
+            {
+                throw new Exception("Retro game not loaded");
+            }
+
             _fullscreen = fullscreen;
 
             //Remember the default video mode sizes
@@ -60,6 +65,10 @@ namespace ScorpionBox.Windows
             var renderer = new FrameRenderer(box);
             State = new WindowState(window, renderer);
             SetFullscreen(fullscreen);
+        }
+
+        public WindowWrapper()
+        {
         }
 
         public bool IsRunning

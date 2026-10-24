@@ -31,11 +31,11 @@ namespace ScorpionBox
     public class ScorpionBoxGame : IDisposable
     {
         public Dictionary<int, Dictionary<retro_device_id_joypad, GlfwKey>> KeyDictionary = [];
-        public WindowWrapper? Window;
-        public Wrapper Retro;
+        // public WindowWrapper Window = new();
+        public Wrapper Retro = new();
 
-        private string _core;
-        private string _game;
+        private string _core = "";
+        private string _game = "";
         private string _title = "BRUTAL";
         private GlfwKey _keyFullscreen;
         private GlfwKey _keyQuit;
@@ -61,7 +61,7 @@ namespace ScorpionBox
             else
             {
                 throw new Exception("Unsupported platform");
-            }            
+            }
             Retro = new Wrapper(".", dll);
 
             var portDevices = new Dictionary<uint, uint>();

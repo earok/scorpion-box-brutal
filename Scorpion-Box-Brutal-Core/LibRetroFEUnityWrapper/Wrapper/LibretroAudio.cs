@@ -26,6 +26,10 @@ namespace SK.Libretro
 {
     public partial class Wrapper
     {
+        public Wrapper()
+        {
+        }
+
         public double FPS => Game.SystemAVInfo.timing.fps;
         public uint Width => Game.SystemAVInfo.geometry.base_width;
         public uint Height => Game.SystemAVInfo.geometry.base_height;
