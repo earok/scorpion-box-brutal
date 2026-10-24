@@ -1,11 +1,8 @@
-﻿using Brutal.GlfwApi;
+﻿using Brutal;
+using Brutal.GlfwApi;
 using Brutal.ImGuiApi;
 using Brutal.ImGuiApi.Backends;
 using Brutal.Numerics;
-using Brutal.OpenGlApi;
-using Brutal.TextureApi;
-using Brutal.TextureApi.Gli;
-using Brutal.VulkanApi.Abstractions;
 using ScorpionBox;
 using ScorpionBox.Processors;
 using ScorpionBox.Services;
@@ -34,7 +31,7 @@ namespace ScorpionBox
     public class ScorpionBoxGame : IDisposable
     {
         public Dictionary<int, Dictionary<retro_device_id_joypad, GlfwKey>> KeyDictionary = [];
-        public WindowWrapper Window;
+        public WindowWrapper? Window;
         public Wrapper Retro;
 
         private string _core;
@@ -56,8 +53,17 @@ namespace ScorpionBox
                 throw new Exception("Failed to initialize GLFW");
             }
 
-            var dll = new DllModuleWindows();
+            DllModule dll;
+            if (Platform.IsWindows)
+            {
+                dll = new DllModuleWindows();
+            }
+            else
+            {
+                throw new Exception("Unsupported platform");
+            }            
             Retro = new Wrapper(".", dll);
+
             var portDevices = new Dictionary<uint, uint>();
             var coreOptionsList = new CoreOptionsList();
             ReadConfig(coreOptionsList, portDevices);
@@ -80,7 +86,7 @@ namespace ScorpionBox
             using var glfwBackend = new GlfwBackend(Window.State.GlfwWindow, GlfwBackend.ClientApi.OpenGL);
             using var openGlBackend = new OpenGlBackend();
 
-            var (logoRef, logoSize) = TextureService.FromFile("./Media/LOGO_BRUTAL_WHT.png");
+            var (logoRef, logoSize) = TextureService.FromFileToImgui("./Media/LOGO_BRUTAL_WHT.png");
             var volumeTime = 0.0;
             var guiTime = 3;
             var ticks = 0;
@@ -177,7 +183,7 @@ namespace ScorpionBox
 
         private bool IsKeyDown(GlfwKey key)
         {
-            return Window.State.GlfwWindow.GetKey(key) != GlfwKeyAction.Release;
+            return Window?.State.GlfwWindow.GetKey(key) != GlfwKeyAction.Release;
         }
 
         private void ReadConfig(CoreOptionsList coreOptionsList, Dictionary<uint, uint> portDevices)

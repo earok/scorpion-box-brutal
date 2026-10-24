@@ -71,14 +71,6 @@ namespace ScorpionBox
 
             _texture = _box.TextureService.GenerateTexture();
 
-            var filter = (int)OpenGl.GL_LINEAR;
-            OpenGl.BindTexture(OpenGl.GL_TEXTURE_2D, _texture.Id);
-            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MIN_FILTER, filter);
-            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MAG_FILTER, filter);
-            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_WRAP_S, (int)OpenGl.GL_CLAMP_TO_EDGE);
-            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_WRAP_T, (int)OpenGl.GL_CLAMP_TO_EDGE);
-            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MAX_LEVEL, 0);
-
             OpenGl.PixelStorei(OpenGl.GL_UNPACK_ALIGNMENT, 1);
             OpenGl.ClearColor(float4.Zero);
         }

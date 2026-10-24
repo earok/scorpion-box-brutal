@@ -15,7 +15,7 @@ namespace ScorpionBox.Services
             OpenGl.DeleteTextures(new ReadOnlySpan<GlTexture>(_textures.ToArray()));
         }
 
-        public unsafe (ImTextureRef, float2) FromFile(string path)
+        public unsafe (ImTextureRef, float2) FromFileToImgui(string path)
         {
             var newTexData = TextureLoader.LoadFromFile(path);
             var logoTexture = GenerateTexture();
@@ -34,8 +34,8 @@ namespace ScorpionBox.Services
             GlTexture logoTexture;
             OpenGl.GenTextures(new ReadOnlySpan<GlTexture>(&logoTexture, 1));
             OpenGl.BindTexture(OpenGl.GL_TEXTURE_2D, logoTexture.Id);
-            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MIN_FILTER, (int)OpenGl.GL_LINEAR);
-            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MAG_FILTER, (int)OpenGl.GL_LINEAR);
+            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MIN_FILTER, (int)OpenGl.GL_NEAREST);
+            OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MAG_FILTER, (int)OpenGl.GL_NEAREST);
             OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_WRAP_S, (int)OpenGl.GL_CLAMP_TO_EDGE);
             OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_WRAP_T, (int)OpenGl.GL_CLAMP_TO_EDGE);
             OpenGl.Native.glTexParameteri(OpenGl.GL_TEXTURE_2D, OpenGl.GL_TEXTURE_MAX_LEVEL, 0);

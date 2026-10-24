@@ -3,7 +3,6 @@ using Brutal;
 using Brutal.GlfwApi;
 using Brutal.Numerics;
 using Brutal.OpenGlApi;
-using SK.Libretro;
 
 namespace ScorpionBox.Windows
 {
@@ -21,7 +20,6 @@ namespace ScorpionBox.Windows
 
         public WindowWrapper(ScorpionBoxGame box, string title, bool fullscreen)
         {
-            State = new WindowState();
             _fullscreen = fullscreen;
 
             //Remember the default video mode sizes
@@ -43,15 +41,14 @@ namespace ScorpionBox.Windows
             _oldSize = new int2((int)box.Retro.Width * bestMultiplier, (int)box.Retro.Height * bestMultiplier);
             _oldPosition = (_fullscreenSize / 2) - (_oldSize / 2);
 
-            State.GlfwWindow = Glfw.CreateWindow(new GlfwWindow.CreateInfo
+            var window = Glfw.CreateWindow(new GlfwWindow.CreateInfo
             {
                 Title = title,
                 Size = _oldSize,
             });
+            
 
-            SetFullscreen(fullscreen);
-
-            State.GlfwWindow.MakeContextCurrent();
+            window.MakeContextCurrent();
             if (!Glad.Initialize(GetProcAddress))
             {
                 throw new Exception("Failed to load OpenGL functions");
@@ -60,7 +57,9 @@ namespace ScorpionBox.Windows
             // Vsync
             Glfw.SwapInterval(1);
 
-            State.Renderer = new FrameRenderer(box);
+            var renderer = new FrameRenderer(box);
+            State = new WindowState(window, renderer);
+            SetFullscreen(fullscreen);
         }
 
         public bool IsRunning
