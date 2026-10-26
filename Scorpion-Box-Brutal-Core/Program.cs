@@ -31,8 +31,8 @@ namespace ScorpionBox
     public class ScorpionBoxGame : IDisposable
     {
         public Dictionary<int, Dictionary<retro_device_id_joypad, GlfwKey>> KeyDictionary = [];
-        // public WindowWrapper Window = new();
-        public Wrapper Retro = new();
+        public WindowWrapper Window;
+        public Wrapper Retro;
 
         private string _core = "";
         private string _game = "";

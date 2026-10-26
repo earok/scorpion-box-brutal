@@ -67,10 +67,6 @@ namespace ScorpionBox.Windows
             SetFullscreen(fullscreen);
         }
 
-        public WindowWrapper()
-        {
-        }
-
         public bool IsRunning
         {
             get
